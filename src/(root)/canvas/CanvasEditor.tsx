@@ -1,0 +1,886 @@
+/**
+ * CanvasEditor Component
+ * 
+ * This component provides a user interface for managing building floors and pins on a map.
+ * It allows users to add, edit, and delete floors and pins, as well as publish changes.
+ * The component includes a sidebar for navigation and actions related to floors, and a canvas
+ * area that displays a map image with associated pins.
+ * 
+ * The component utilizes React hooks for state management and side effects, and it integrates
+ * with a backend API for loading and saving floor and pin data. It also handles user authentication
+ * and loading states.
+ * 
+ * @module CanvasEditor
+ * 
+ * @requires react
+ * @requires react-router-dom
+ * @requires ../../components/NavigationBar
+ * @requires ./PinComponent
+ * @requires ./PinDetailsModal
+ * @requires ./FloorComponent
+ * @requires ./ModalDialog
+ * @requires ../../data/types
+ * @requires react-auth-kit/hooks/useAuthHeader
+ * @requires ../../lib/Canvas.helper
+ * @requires ../../context/LoadingProvider
+ * @requires @fortawesome/react-fontawesome
+ * @requires ../../constant/COLORS
+ * @requires ./HelpModal
+ * @requires react-tooltip
+ * 
+ * @typedef {Object} PinDetails
+ * @property {string} pinName - The name of the pin.
+ * @property {string} pinDescription - A description of the pin.
+ * @property {string} pinType - The type of location the pin represents (e.g., "room", "exit").
+ * @property {string} pinImage - URL or path to an image representing the pin.
+ * 
+ * @typedef {Object} FloorData
+ * @property {string} buildingID - The ID of the building the floor belongs to.
+ * @property {string} floorID - The unique ID of the floor.
+ * @property {string} floorName - The name of the floor.
+ * @property {string} floorNumber - The number/level of the floor.
+ * @property {File} floorImage - The image file representing the floor.
+ * @property {string} updatedAt - The timestamp of the last update.
+ * 
+ * @returns {JSX.Element} The rendered CanvasEditor component.
+ */
+
+// REACT
+import { useEffect, useRef, useState } from "react";
+
+// ROUTER
+import { useParams, useLocation } from "react-router-dom"
+
+// COMPONENT
+import NavigationBar from "../../components/NavigationBar";
+import PinComponent from "./PinComponent";
+import PinDetailsModal from "./PinDetailsModal";// Ensure the file 'PinDetailsModal.tsx' exists in the same directory
+
+// ICONS
+import { FloorComponent } from "./FloorComponent";
+import { ModalDialog } from "./ModalDialog";
+
+// INTERFACE
+import { FloorData, Pins } from "../../data/types";
+
+// AUTH
+import useAuthHeader from 'react-auth-kit/hooks/useAuthHeader';
+
+// API
+import { createFloorHandler, loadFloorHandler, setPinHandler } from "../../lib/Canvas.helper";
+import { useLoading } from "../../context/LoadingProvider";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faBuilding, faCircleArrowLeft, faPencil, faQuestionCircle, faSave } from "@fortawesome/free-solid-svg-icons";
+import { COLORS } from "../../constant/COLORS";
+import { HelpModal } from "./HelpModal";
+import { Tooltip } from "react-tooltip";
+
+const useQuery = () => new URLSearchParams(useLocation().search);
+
+const validateFile = (file: File | null): boolean => {
+  if (!file) return true; // No file to validate
+  if (!file.type.startsWith("image/")) {
+    console.error("Invalid file type. Please upload an image.");
+    alert("Invalid file type. Please upload an image.");
+    return false;
+  }
+
+  return true;
+}
+
+const CanvasEditor = () => {
+  const { buildingID } = useParams();
+  const query = useQuery();
+
+  // QUERY
+  const buildingName = query.get('building_name');
+  const floorCount = query.get('count_floor');
+
+  // AUTH
+  const authHeader = useAuthHeader();
+
+  // CONTEXT
+  const { setLoading } = useLoading();
+
+  // LAYERS RELATED
+  const [layers, setLayers] = useState<{ floorID: string; layerName: string }[]>([]);
+
+  // REF
+  const imageRef = useRef<HTMLImageElement>(null);
+
+  // FLOOR RELATED
+  const [selectedFloorID, setSelectedFloorID] = useState<string | null>(null); // Track selected floor
+  const [isModalOpen, setIsModalOpen] = useState(false);  // OKAY
+  const [floors, setFloors] = useState<FloorData[] | undefined>([]);
+  const [mapImage, setMapImage] = useState<string | null | undefined>(null);
+
+  // PIN RELATED
+  type PinDetails = Pins['details'];
+  const [editable, setEditable] = useState<boolean>(false);
+  const [newPin, setNewPin] = useState<{ xPercent: number; yPercent: number } | null>(null);
+  const [activePinIndex, setActivePinIndex] = useState<number | null>(null); // Track the active pin for the popover
+  const [editingPinIndex, setEditingPinIndex] = useState<number | null>(null); // Track the pin being edited
+  const [pins, setPins] = useState<{ [floorID: string]: Pins[] }>({}); // STORES ALL PIN
+  const [pinsByFloor, setPinsByFloor] = useState<Pins[]>([]); // STORES ALL PINS OF THE CURRENT FLOOR
+  const [pinDetails, setPinDetails] = useState<PinDetails | null>(); // STORE PIN DETAILS OF THE ACTIVE INDEX
+  const [mapLoaded, setMapLoaded] = useState<boolean>(false); // STATE FOR MAP TRACKING
+  const [toDeletePin, setToDeletPin] = useState<string[]>([]);
+
+  // MODAL RELATED
+  const [isPinModalOpen, setIsPinModalOpen] = useState<boolean>(false); // State for pin modal
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState<boolean>(false);
+
+  // CORRDINATES SYSTEM
+  const handleImageClick = (event: React.MouseEvent<HTMLImageElement>) => {
+    if (!imageRef.current)
+      return;
+
+    if (!selectedFloorID) {
+      alert('Please select a floor first before editing.');
+      return;
+    }
+
+    if (!editable) {
+      console.warn('Editing is currently disabled.');
+      return;
+    }
+
+    // Get the actual image's bounding box
+    const rect = imageRef.current.getBoundingClientRect();
+
+    const pixelX = event.clientX - rect.left;
+    const pixelY = event.clientY - rect.top;
+
+    const xPercent = (pixelX / rect.width) * 100;
+    const yPercent = (pixelY / rect.height) * 100;
+
+    setNewPin({ xPercent, yPercent });
+    setIsPinModalOpen(true);
+  };
+
+  /**
+   * Handles adding a new pin with provided details to the selected floor.
+   * 
+   * This function adds a new pin to the pins collection, updates the available layers,
+   * and refreshes the pins list for the current floor. It also resets the new pin state
+   * and closes the pin modal.
+   * 
+   * @param {PinDetails} details - The details of the pin to be added including name, description, type, and image.
+   * @returns {void}
+   * 
+   * @example
+   * // Add a new pin with specific details
+   * handleAddPinDetails({
+   *   pinName: "Meeting Room",
+   *   pinDescription: "Main conference room",
+   *   pinType: "room",
+   *   pinImage: "room.jpg"
+   * });
+   * 
+   * @typedef {Object} PinDetails
+   * @property {string} pinName - The name of the pin.
+   * @property {string} pinDescription - A description of the pin.
+   * @property {string} pinType - The type of location the pin represents (e.g., "room", "exit").
+   * @property {string} pinImage - URL or path to an image representing the pin.
+   */
+  const handleAddPinDetails = (details: PinDetails): void => {
+    if (newPin && selectedFloorID) {
+      const incomingPin: Pins = {
+        pinID: Math.random().toString(),
+        details: {
+          floorID: selectedFloorID,
+          pinName: details.pinName,
+          pinDescription: details.pinDescription,
+          pinType: details.pinType,
+          pinImage: details.pinImage,
+        },
+        coordinates: {
+          x: newPin.xPercent,
+          y: newPin.yPercent,
+        }
+      }
+
+      console.log(details);
+
+      setPins((prev) => ({
+        ...prev,
+        [selectedFloorID]: [...(prev[selectedFloorID] || []), incomingPin]
+      }))
+
+      setLayers((prev) => [
+        ...prev,
+        { floorID: selectedFloorID, layerName: details!.pinName }
+      ])
+
+      setPinsByFloor((prev) => [...prev, incomingPin]);
+
+      console.log(pinsByFloor);
+      setNewPin(null); // Reset new pin
+      setIsPinModalOpen(false); // Close the modal
+    }
+  };
+
+  /**
+   * Handles the click event on a pin in the floor map.
+   * 
+   * When a pin is clicked, this function toggles its active state and updates
+   * the pin details display. If the same pin is clicked twice, it deactivates 
+   * the pin selection.
+   * 
+   * @param {number} index - The index of the clicked pin in the pinsByFloor array.
+   * @returns {void}
+   * 
+   * @example
+   * // When pin at index 2 is clicked
+   * handlePinClick(2);
+   * 
+   * @throws {TypeError} Potential error if pinsByFloor[index] doesn't exist or if selectedFloorID is null/undefined.
+   */
+  const handlePinClick = (index: number): void => {
+    setActivePinIndex((prevIndex) => (prevIndex === index ? null : index));
+
+    const info = pinsByFloor[index].details;
+
+    const formattedInfo = {
+      floorID: selectedFloorID!,
+      pinName: info.pinName,
+      pinType: info.pinType,
+      pinDescription: info.pinDescription,
+      pinImage: info.pinImage
+    };
+
+    setPinDetails(formattedInfo);
+
+    console.log(pinDetails);
+  }
+
+  /**
+   * Handles editing an existing pin with updated details.
+   * 
+   * This function updates a pin's details across multiple state structures:
+   * - Updates the pin in the pinsByFloor array
+   * - Updates the corresponding pin in the pins object organized by floor
+   * - Updates the associated layer in the layers array
+   * 
+   * After updating all relevant state, it resets the editing state and closes the modal.
+   * 
+   * @param {PinDetails} updatedDetails - The new details for the pin being edited.
+   * @returns {void}
+   * 
+   * @example
+   * // Edit a pin with updated information
+   * handleEditPin({
+   *   floorID: "floor1",
+   *   pinName: "Updated Meeting Room",
+   *   pinDescription: "Renovated conference room",
+   *   pinType: "room",
+   *   pinImage: "updated-room.jpg"
+   * });
+   * 
+   * @throws {TypeError} Potential error if selectedFloorID is null/undefined or editingPinIndex is invalid.
+   */
+  const handleEditPin = (updatedDetails: PinDetails): void => {
+    if (selectedFloorID && editingPinIndex) {
+
+      const currentPin = pinsByFloor[editingPinIndex];
+
+      const updatedPin: Pins = {
+        ...currentPin,
+        details: updatedDetails
+      };
+
+      // Update local state
+      setPinsByFloor((prev) => {
+        const updated = [...prev];
+        updated[editingPinIndex] = updatedPin;
+        return updated;
+      });
+
+      setPins((prev) => {
+        const floorPins = [...(prev[selectedFloorID] || [])];
+        // Find the correct pin in the floor pins array
+        const pinIndexInFloor = floorPins.findIndex(p =>
+          p.pinID === currentPin.pinID);
+
+        if (pinIndexInFloor !== -1) {
+          floorPins[pinIndexInFloor] = updatedPin;
+        }
+
+        return {
+          ...prev,
+          [selectedFloorID]: floorPins
+        };
+      });
+
+      setLayers((prev) =>
+        prev.map((layer) =>
+          layer.floorID === selectedFloorID && layer.layerName === updatedDetails.pinName
+            ? { ...layer, layerName: updatedDetails.pinName }
+            : layer
+        )
+      );
+    }
+
+    setEditingPinIndex(null); // Reset editing index
+    setIsPinModalOpen(false); // Close the modal
+  };
+
+  /**
+   * Handles the deletion of a pin from the floor map.
+   * 
+   * This function:
+   * - Validates that a floor is selected
+   * - Adds the pin ID to the deletion queue (toDeletePin)
+   * - Removes the pin from the pins object organized by floor
+   * - Updates the pinsByFloor array for the current floor
+   * - Removes the corresponding layer from the layers array
+   * - Resets the active pin selection
+   * 
+   * @param {number} index - The index of the pin to delete in the current floor's pin array.
+   * @returns {void}
+   * 
+   * @example
+   * // Delete pin at index 3
+   * handleDeletePin(3);
+   * 
+   * @throws {Error} Error message in console if selectedFloorID is not available.
+   */
+  const handleDeletePin = (index: number): void => {
+    if (!selectedFloorID) {
+      console.error("selectedFloorID is required");
+      return; // Handle the error as needed
+    }
+
+    const pinToDelete = pins[selectedFloorID]?.[index];
+
+    if (pinToDelete?.pinID) {
+      setToDeletPin(prev => [...prev, pinToDelete.pinID]);
+    }
+
+    // Update the pins state
+    setPins((prev) => {
+      const floorPins = prev[selectedFloorID]; // Get the current pins for the floor
+      const updatedPins = floorPins.filter((_, i) => i !== index); // Filter out the pin at the specified index
+
+      return {
+        ...prev,
+        [selectedFloorID]: updatedPins, // Update the specific floorID with the new array
+      };
+    });
+
+    // Update pinsByFloor state
+    setPinsByFloor(() => {
+      const floorPins = pins[selectedFloorID]; // Get the current pins for the floor
+      const updatedPins = floorPins.filter((_, i) => i !== index); // Filter out the pin at the specified index
+      return updatedPins; // Set the updated pins for the current floor
+    });
+
+    // Update layers state
+    setLayers((prev) => {
+      return prev.filter((_, i) => i !== index || prev[i].floorID !== selectedFloorID);
+    });
+
+    setActivePinIndex(null); // Close the popover
+  };
+
+  /**
+   * Handles toggling edit mode and saving pin changes to the server.
+   * 
+   * This function has dual functionality:
+   * 1. If not in edit mode, it enables edit mode and returns early
+   * 2. If in edit mode, it validates necessary parameters and sends pin updates to the server
+   * 
+   * The function manages loading state during API calls and toggles edit mode upon completion.
+   * 
+   * @async
+   * @returns {Promise<null|void>} Returns null if the API call fails, otherwise void
+   * @throws {Error} Various errors if required parameters are missing:
+   *                 - If buildingID is missing
+   *                 - If authHeader is missing
+   *                 - If selectedFloorID is missing
+   * 
+   * @example
+   * // Toggle edit mode or save changes
+   * await handleSavePins();
+   */
+  const handleSavePins = async (): Promise<null | void> => {
+    if (!editable) {
+      setEditable(true);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (!buildingID) {
+        throw new Error('Can not load existing target expat,-buildingID');
+      }
+
+      if (!authHeader) {
+        throw new Error("Authorization header is missing. Please log in again.");
+      }
+
+      if (!selectedFloorID) {
+        throw new Error("Can not find existing floor,-floorID")
+      }
+
+      const response = await setPinHandler(buildingID, authHeader, selectedFloorID, pinsByFloor, toDeletePin);
+
+      if (!response) {
+        return null;
+      }
+
+      console.log('Success');
+    } catch (error: any) {
+      console.error(error || error.response?.data?.error);
+    } finally {
+      setLoading(false);
+      setEditable(!editable);
+    }
+  }
+
+  /**
+   * Loads and processes floor data for the current building.
+   * 
+   * This function:
+   * - Validates authentication credentials
+   * - Fetches floor data from the server
+   * - Processes the raw floor data to extract pin information
+   * - Updates multiple state variables (pins, layers, floors)
+   * - Handles loading states during the process
+   * 
+   * @async
+   * @returns {Promise<void>}
+   * @throws {Error} Various errors may occur during API calls or data processing
+   * 
+   * @example
+   * // Load floor data for the current building
+   * await handleLoadFloorEvent();
+   * 
+   * @requires buildingID - The ID of the building to load floors for
+   * @requires authHeader - Authorization header for API authentication
+   */
+  const handleLoadFloorEvent = async (): Promise<void> => {
+    setLoading(true, 'Setting up floor data...');
+    try {
+
+      if (!buildingID) {
+        console.log('AMBOT');
+      }
+
+      if (!authHeader) {
+        console.error("Authorization header is missing.");
+        alert("Authorization header is missing. Please log in again.");
+        return;
+      }
+
+      const rawFloors: object[] | null = await loadFloorHandler(buildingID, authHeader);
+
+      if (!rawFloors) {
+        console.log('Data is empty.');
+      }
+
+      const updatedFloors = rawFloors!.map((floor: any) => {
+
+        const pins: Pins[] = floor.pin.map((pinner: any) => ({
+          pinID: pinner._id,
+          details: {
+            floorID: floor.floorID,
+            pinName: pinner.details.pinName,
+            pinType: pinner.details.pinType,
+            pinDescription: pinner.details.pinDescription,
+            pinImage: pinner.pinImage,
+          },
+          coordinates: {
+            x: pinner.coordinates.x,
+            y: pinner.coordinates.y,
+          }
+        })) || [];
+
+        setPins((prev) => ({
+          ...prev,
+          [floor.floorID]: pins
+        }));
+
+        const layers = pins.map((pin) => ({
+          floorID: floor.floorID, // Use the floor ID
+          layerName: pin.details.pinName || 'Unnamed Pin', // Use the pin name or a default value
+        }));
+
+        setLayers(layers)
+
+        return {
+          floorID: floor.floorID,
+          buildingID: floor.buildingID,
+          floorNumber: floor.floorNumber,
+          floorName: floor.floorName,
+          floorImage: floor.floorImage,
+          pin: pins.length > 0 ? pins : null,
+          updatedAt: new Date().toString(),
+          layers: layers
+        }
+      })
+
+      setFloors(updatedFloors || []);
+
+    } catch (error: any) {
+      console.log(error || error.response?.data?.error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Handles the selection of a floor from the available floors.
+   * 
+   * This function:
+   * - Prevents floor switching if currently in edit mode with unsaved changes
+   * - Sets the selected floor ID in state
+   * - Manages loading state during the operation
+   * - Locates the selected floor data from the floors array
+   * - Updates the current pins display based on the selected floor
+   * - Sets the floor map image for display
+   * 
+   * @param {string} floorID - The ID of the floor to select
+   * @returns {void}
+   * 
+   * @example
+   * // Select floor with ID 'floor123'
+   * handleSelectFloor('floor123');
+   * 
+   * @throws {Error} May throw errors during processing that will be caught and logged
+   */
+  const handleSelectFloor = (floorID: string): void => {
+    if (selectedFloorID && editable) {
+      alert('Please save the current progress before switching floors.');
+      return;
+    }
+
+    setSelectedFloorID(floorID);
+    setLoading(true, 'Loading Map...');
+    try {
+
+      const selectedFloor = floors?.find((floor) => floor.floorID === floorID);
+
+      // If no selected floor, return error.
+      if (!selectedFloor) {
+        alert('The selected floor does not exist. Please choose a valid floor.');
+        return;
+      }
+
+      setPinsByFloor(pins[floorID] ?? []);
+      setMapImage(selectedFloor.floorImage);
+
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Handles the creation of a new floor for the current building.
+   * 
+   * This function:
+   * - Validates the map file, floor name, and floor number
+   * - Verifies authentication is present
+   * - Prepares floor data for submission
+   * - Submits the floor creation request to the server
+   * - Updates the floors state with the newly created floor
+   * - Manages loading state during the operation
+   * 
+   * @async
+   * @param {Object} data - The floor data from the form
+   * @param {string} data.floorName - The name of the floor
+   * @param {string} data.floorNum - The number/level of the floor
+   * @param {File[]} data.mapFile - Array containing the floor map image file
+   * @returns {Promise<void>}
+   * 
+   * @example
+   * // Create a new floor with form data
+   * await handleAddFloorEvent({
+   *   floorName: "Ground Floor",
+   *   floorNum: "0",
+   *   mapFile: [fileObject]
+   * });
+   * 
+   * @requires validateFile - Function to validate the uploaded file
+   * @requires authHeader - Authorization header for API authentication
+   * @requires buildingID - The ID of the building to add the floor to
+   */
+  const handleAddFloorEvent = async (data: any): Promise<void> => {
+    const file = data.mapFile && data.mapFile.length > 0 ? data.mapFile[0] : null;
+
+    // Validate file
+    if (!validateFile(file)) return;
+
+    // Validate floorName and floorNum fields
+    if (!data.floorName || !data.floorNum) {
+      console.error("Floor name and floor number are required.");
+      alert("Please provide both the floor name and floor number.");
+      return;
+    }
+
+    // Validate authorization header
+    if (!authHeader) {
+      console.error("Authorization header is missing.");
+      alert("Authorization header is missing. Please log in again.");
+      return;
+    }
+
+    const floorData: FloorData = {
+      buildingID: buildingID ?? null,
+      floorID: null,
+      floorName: data.floorName,
+      floorNumber: data.floorNum,
+      floorImage: file,
+      updatedAt: new Date().toISOString(), // Add updatedAt property
+    }
+
+    setLoading(true, 'Loading Map...');
+    try {
+      const newFloor = await createFloorHandler(floorData, authHeader);
+
+      if (!newFloor) {
+        console.error("Failed to create a new floor.");
+        alert("An error occurred while creating the floor. Please try again.");
+        return;
+      }
+
+      const { currentFloor } = newFloor as { currentFloor: any };
+
+      setFloors([
+        ...(floors || []),
+        {
+          floorID: currentFloor.floorID,
+          buildingID: currentFloor || "",
+          floorNumber: currentFloor.floorNumber,
+          floorName: currentFloor.floorName,
+          floorImage: currentFloor.floorImage,
+          updatedAt: new Date().toString(),
+        }
+      ]);
+
+    } catch (error) {
+      console.error("Error creating floor:", error);
+      alert("An unexpected error occurred. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteFloor = (id: string) => {
+    setFloors(floors?.filter((floor) => floor.floorID !== id));
+  };
+
+  // default loads
+
+  useEffect(() => {
+    handleLoadFloorEvent();
+  }, [buildingID])
+
+  /**
+   * useEffect hook to manage browser navigation events for unsaved changes.
+   * 
+   * This effect adds event listeners for the `beforeunload` and `popstate` events.
+   * When the user attempts to leave the page or navigate back, it prompts them
+   * with a confirmation dialog if there are unsaved changes (when `editable` is true).
+   * 
+   * The `beforeunload` event prevents the user from closing or refreshing the page
+   * without confirmation, while the `popstate` event handles back navigation.
+   * 
+   * @param {boolean} editable - A flag indicating whether the user is in an editable state.
+   * 
+   * @returns {void} - This effect does not return a value. It sets up and cleans up event listeners.
+   */
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (editable) {
+        e.preventDefault();
+        e.returnValue = ''; // Show confirmation dialog
+      }
+    };
+
+    const handlePopState = () => {
+      if (editable && !window.confirm('Are you sure you want to go back? Unsaved changes will be lost.')) {
+        // Push the current page back to prevent navigation
+        window.history.pushState(null, '', window.location.href);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('popstate', handlePopState);
+
+    // Add dummy state so we can detect back
+    window.history.pushState(null, '', window.location.href);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [editable]);
+
+  /**
+   * Component that renders a user interface for managing building floors and pins on a map.
+   * 
+   * This component includes a sidebar for navigation and actions related to floors,
+   * as well as a canvas area that displays a map image and associated pins. It provides
+   * functionality to add, edit, and delete floors and pins, as well as publish changes.
+   * 
+   * @component
+   * @param {Object} props - The component props.
+   * @param {string} props.buildingName - The name of the building.
+   * @param {number} props.floorCount - The total number of floors in the building.
+   * @param {Array<FloorData>} props.floors - An array of floor data objects.
+   * @param {Array<LayerData>} props.layers - An array of layer data objects associated with the floors.
+   * @param {Array<PinData>} props.pinsByFloor - An array of pin data objects for the current floor.
+   * @param {string} props.mapImage - The URL of the map image to be displayed.
+   * @param {boolean} props.editable - A flag indicating whether the user can edit the map.
+   * @param {boolean} props.isModalOpen - A flag indicating whether the add floor modal is open.
+   * @param {boolean} props.isPinModalOpen - A flag indicating whether the pin details modal is open.
+   * @param {boolean} props.isHelpModalOpen - A flag indicating whether the help modal is open.
+   * @param {function} props.setIsModalOpen - Function to set the state of the add floor modal.
+   * @param {function} props.setIsPinModalOpen - Function to set the state of the pin details modal.
+   * @param {function} props.setIsHelpModalOpen - Function to set the state of the help modal.
+   * @param {function} props.handleAddFloorEvent - Function to handle adding a new floor.
+   * @param {function} props.handleEditPin - Function to handle editing a pin.
+   * @param {function} props.handleAddPinDetails - Function to handle adding pin details.
+   * @param {function} props.handleDeletePin - Function to handle deleting a pin.
+   * @param {function} props.handleSelectFloor - Function to handle selecting a floor.
+   * @param {function} props.handleSavePins - Function to handle saving pins.
+   * @param {function} props.handleDeleteFloor - Function to handle deleting a floor.
+   * @returns {JSX.Element} The rendered component.
+   */
+  return (
+    <div className="w-full h-screen select-none">
+      <NavigationBar />
+      <div className="h-[calc(100%-4rem)] bg-uc-editor-bg flex flex-row gap-0">
+        {/* SIDE BAR */}
+        <div className="w-[250px] border-r-1 flex flex-col h-full bg-white">
+          <div className="p-3 text-center border-b-1 border-gray-300 flex flex-row gap-2">
+            <button className="cursor-pointer">
+              <FontAwesomeIcon icon={faCircleArrowLeft} color={COLORS.BLUE} className="text-2xl" />
+            </button>
+            <h1 className="font-semibold text-xl">{buildingName} - {floorCount}</h1>
+          </div>
+          {/* BUTTON */}
+          <div className="p-3 text-center border-b-1 border-gray-300">
+            <button className="bg-yellow-600 px-8 py-2 rounded-lg text-white font-semibold tracking-wider cursor-pointer hover:bg-yellow-700 w-[150px]" onClick={() => setIsModalOpen(true)}>
+              Add Floor
+            </button>
+          </div>
+          {/* BUTTON */}
+          <div className="p-3 text-center border-b-1 border-gray-300 gap-2 flex justify-center">
+            <button
+              className="bg-yellow-600 px-6 py-2 rounded-lg text-white font-semibold tracking-wider cursor-pointer hover:bg-yellow-700 w-[150px]"
+              data-tooltip-id="publish-btn"
+              data-tooltip-content="Publish to live users"
+            >
+              Publish
+            </button>
+            <Tooltip id="publish-btn" className="z-150" />
+            <Tooltip id="save-btn" className="z-150" />
+          </div>
+          {/* LAYER LIST */}
+          <div className="px-2 py-3 max-h-[1000px] overflow-auto scrollbar-hide">
+            <h1 className="text-md">Layers</h1>
+            <div className="flex flex-col gap-2 mt-2 ">
+              {floors?.map((floor: FloorData) => (
+                <FloorComponent
+                  key={floor.floorID}
+                  floorName={floor.floorName}
+                  floorID={floor.floorID!}
+                  floorNumber={floor.floorNumber}
+                  onDelete={handleDeleteFloor}
+                  onSelect={() => handleSelectFloor(floor.floorID!)} // Pass floorID to select
+                  layers={layers.filter((layer) => layer.floorID === floor.floorID)}
+                  selected={selectedFloorID === floor.floorID}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+        {/* CANVAS */}
+        {floors && floors.length > 0 ? (
+          <>
+            {mapImage && (
+              <>
+                <div className="overflow-auto flex-1 relative" >
+                  <div className="max-w-fit max-h-fit m-2 p-2 bg-white z-15 absolute rounded-md justify-around items-center gap-3">
+                    <button
+                      className={`flex justify-center items-center flex-col p-3 hover:bg-gray-200 cursor-pointer gap-1 rounded min-w-[75px] ${isHelpModalOpen ? "bg-gray-200" : "bg-white"}`}
+                    >
+                      <FontAwesomeIcon icon={faBuilding} color={COLORS.BLUE} className="text-xl" />
+                      <h3 className="text-blue-950 font-semibold">Project</h3>
+                    </button>
+                    <button
+                      className={`flex justify-center items-center flex-col p-3 hover:bg-gray-200 cursor-pointer gap-1 rounded min-w-[75px] ${editable ? "bg-gray-200" : "bg-white"}`}
+                      onClick={() => handleSavePins()}
+                    >
+                      <FontAwesomeIcon icon={editable ? faSave : faPencil} color={COLORS.BLUE} className="text-xl" />
+                      <h3 className="text-blue-950 font-semibold">{`${editable ? "Save" : "Edit"}`}</h3>
+                    </button>
+                    <button
+                      className={`flex justify-center items-center flex-col p-3 hover:bg-gray-200 cursor-pointer gap-1 rounded min-w-[75px] ${isHelpModalOpen ? "bg-gray-200" : "bg-white"}`}
+                      onClick={() => setIsHelpModalOpen(true)}
+                    >
+                      <FontAwesomeIcon icon={faQuestionCircle} color={COLORS.BLUE} className="text-xl" />
+                      <h3 className="text-blue-950 font-semibold">Help</h3>
+                    </button>
+                  </div>
+                  <div className={`w-[1280px] max-h-[auto] mx-30 my-10 relative ${editable ? "cursor-pointer" : ""}`}>
+                    <img src={mapImage} alt="Map" onClick={handleImageClick} className="max-h-full max-w-full" ref={imageRef} onLoad={() => { setMapLoaded(true) }} />
+                    {/* Pin Layer - Positioned absolutely on top of the image */}
+                    {mapLoaded && (
+                      <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+                        {pinsByFloor.map((pin, index) => (
+                          <PinComponent
+                            key={index}
+                            xPercent={pin.coordinates.x}
+                            yPercent={pin.coordinates.y}
+                            details={pin.details}
+                            isActive={activePinIndex === index}
+                            onClick={() => handlePinClick(index)}
+                            onEdit={() => { setEditingPinIndex(index); setIsPinModalOpen(true) }}
+                            onDelete={() => handleDeletePin(index)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </>
+        ) : (
+          <h1>No map Image available</h1>
+        )}
+      </div>
+      <ModalDialog
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onAddFloor={handleAddFloorEvent} />
+      <PinDetailsModal
+        selectedFloorID={selectedFloorID!}
+        isOpen={isPinModalOpen}
+        onClose={() => {
+          setIsPinModalOpen(false);
+          setEditingPinIndex(null);
+        }}
+        onSave={(pinDetails) => {
+          if (editingPinIndex !== null) {
+            handleEditPin(pinDetails);
+          } else {
+            handleAddPinDetails(pinDetails);
+          }
+        }}
+        initdetails={pinDetails!}
+      />
+      <HelpModal
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
+      />
+    </div>
+  )
+}
+
+export default CanvasEditor

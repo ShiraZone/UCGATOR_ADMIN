@@ -1,0 +1,23 @@
+import React from 'react'
+import IMAGE from '../../constant/IMAGES'
+
+const Dashboard = () => {
+  return (
+    <div className='w-full h-full'>
+      <div className='p-5'>
+        <h1 className='text-xl font-bold tracking-wider'>Dashboard</h1>
+      </div>
+      {/* BANNER */}
+      <div className='h-[150px] p-5 bg-uc-blue flex flex-row'>
+        <img src={IMAGE.BannerPlane} alt="banner_plane.png" className='size-28'/>
+        <div className='text-white gap-1 flex flex-col mx-5'>
+          <h1 className='text-5xl font-bold'>Hello Admin!</h1>
+          <h3 className='text-xl'>Welcome back to your dashboard.</h3>
+          <h3 className='text-xl'>Use this section to enhance UCnian experience around the campus.</h3>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default Dashboard
