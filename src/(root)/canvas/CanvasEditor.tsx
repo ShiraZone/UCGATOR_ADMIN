@@ -46,19 +46,26 @@
  */
 
 // REACT
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState
+} from "react";
 
 // ROUTER
-import { useParams, useLocation } from "react-router-dom"
+import {
+  useParams,
+  useLocation,
+  useNavigate
+} from "react-router-dom"
 
 // COMPONENT
-import NavigationBar from "../../components/NavigationBar";
+import NavigationBar from "@/components/NavigationBar";
 import PinComponent from "./PinComponent";
-import PinDetailsModal from "./PinDetailsModal";// Ensure the file 'PinDetailsModal.tsx' exists in the same directory
-
-// ICONS
+import PinDetailsModal from "./PinDetailsModal";
 import { FloorComponent } from "./FloorComponent";
 import { ModalDialog } from "./ModalDialog";
+import { DialogConfirm } from "@/components/DialogConfirm";
 
 // INTERFACE
 import { FloorData, Pins } from "../../data/types";
@@ -67,13 +74,29 @@ import { FloorData, Pins } from "../../data/types";
 import useAuthHeader from 'react-auth-kit/hooks/useAuthHeader';
 
 // API
-import { createFloorHandler, loadFloorHandler, setPinHandler } from "../../lib/Canvas.helper";
+import {
+  createFloorHandler,
+  deleteTargetObject,
+  loadFloorHandler,
+  publishedBuilding,
+  setPinHandler
+} from "../../lib/Canvas.helper";
+
+// CONTEXT
 import { useLoading } from "../../context/LoadingProvider";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBuilding, faCircleArrowLeft, faPencil, faQuestionCircle, faSave } from "@fortawesome/free-solid-svg-icons";
+import {
+  faBuilding,
+  faCircleArrowLeft,
+  faPencil,
+  faQuestionCircle,
+  faSave
+} from "@fortawesome/free-solid-svg-icons";
 import { COLORS } from "../../constant/COLORS";
 import { HelpModal } from "./HelpModal";
 import { Tooltip } from "react-tooltip";
+import { useToast } from "@/context/ToastProvider"
+import { initializeApiToasts } from "@/config/apiClient"
 
 const useQuery = () => new URLSearchParams(useLocation().search);
 
@@ -92,10 +115,13 @@ const CanvasEditor = () => {
   const { buildingID } = useParams();
   const query = useQuery();
 
+  // DOM
+  const navigate = useNavigate()
+
   // QUERY
   const buildingName = query.get('building_name');
   const floorCount = query.get('count_floor');
-
+  const published = query.get('status');
   // AUTH
   const authHeader = useAuthHeader();
 
@@ -125,10 +151,25 @@ const CanvasEditor = () => {
   const [pinDetails, setPinDetails] = useState<PinDetails | null>(); // STORE PIN DETAILS OF THE ACTIVE INDEX
   const [mapLoaded, setMapLoaded] = useState<boolean>(false); // STATE FOR MAP TRACKING
   const [toDeletePin, setToDeletPin] = useState<string[]>([]);
-
+  const [openConfirmatory, setOpenConfirmatory] = useState<boolean>(false);
   // MODAL RELATED
   const [isPinModalOpen, setIsPinModalOpen] = useState<boolean>(false); // State for pin modal
   const [isHelpModalOpen, setIsHelpModalOpen] = useState<boolean>(false);
+
+  // CONFIGURATION RELATED
+  const handleHistoryPush = () => {
+    if (selectedFloorID && editable) {
+      alert('Please save any work in progress.');
+      return;
+    }
+
+    if (activePinIndex && editable) {
+      alert('Please save any work in progress.');
+      return;
+    }
+
+    navigate('/canvas')
+  }
 
   // CORRDINATES SYSTEM
   const handleImageClick = (event: React.MouseEvent<HTMLImageElement>) => {
@@ -143,6 +184,17 @@ const CanvasEditor = () => {
     if (!editable) {
       console.warn('Editing is currently disabled.');
       return;
+    }
+
+    if (activePinIndex !== null) {
+      setActivePinIndex(null);
+      setPinDetails({
+        floorID: "",
+        pinName: "",
+        pinType: "",
+        pinDescription: "",
+        pinImage: ""
+      });
     }
 
     // Get the actual image's bounding box
@@ -249,9 +301,9 @@ const CanvasEditor = () => {
       pinImage: info.pinImage
     };
 
-    setPinDetails(formattedInfo);
-
-    console.log(pinDetails);
+    if (selectedFloorID === info.floorID) {
+      setPinDetails(formattedInfo);
+    }
   }
 
   /**
@@ -479,8 +531,9 @@ const CanvasEditor = () => {
         console.log('Data is empty.');
       }
 
-      const updatedFloors = rawFloors!.map((floor: any) => {
+      let allLayers: any[] = [];
 
+      const updatedFloors = rawFloors!.map((floor: any) => {
         const pins: Pins[] = floor.pin.map((pinner: any) => ({
           pinID: pinner._id,
           details: {
@@ -501,12 +554,12 @@ const CanvasEditor = () => {
           [floor.floorID]: pins
         }));
 
-        const layers = pins.map((pin) => ({
+        const newLayers = pins.map((pin) => ({
           floorID: floor.floorID, // Use the floor ID
           layerName: pin.details.pinName || 'Unnamed Pin', // Use the pin name or a default value
         }));
 
-        setLayers(layers)
+        allLayers = [...allLayers, ...newLayers];
 
         return {
           floorID: floor.floorID,
@@ -516,10 +569,11 @@ const CanvasEditor = () => {
           floorImage: floor.floorImage,
           pin: pins.length > 0 ? pins : null,
           updatedAt: new Date().toString(),
-          layers: layers
+          layers: newLayers
         }
       })
 
+      setLayers(allLayers);
       setFloors(updatedFloors || []);
 
     } catch (error: any) {
@@ -556,6 +610,14 @@ const CanvasEditor = () => {
     }
 
     setSelectedFloorID(floorID);
+    setActivePinIndex(null);
+    setPinDetails({
+      floorID: floorID,
+      pinName: "",
+      pinType: "",
+      pinDescription: "",
+      pinImage: ""
+    });
     setLoading(true, 'Loading Map...');
     try {
 
@@ -617,6 +679,9 @@ const CanvasEditor = () => {
     if (!data.floorName || !data.floorNum) {
       console.error("Floor name and floor number are required.");
       alert("Please provide both the floor name and floor number.");
+
+
+
       return;
     }
 
@@ -668,9 +733,66 @@ const CanvasEditor = () => {
     }
   };
 
-  const handleDeleteFloor = (id: string) => {
+  const handleDeleteFloor = async (id: string) => {
+    if (selectedFloorID && editable) {
+      alert('Please save any work in progress');
+      return;
+    }
+
+    setLoading(true, 'Deleting Floor.');
+    try {
+      // Validate authorization header
+      if (!authHeader) {
+        console.error("Authorization header is missing.");
+        alert("Authorization header is missing. Please log in again.");
+        return;
+      }
+
+      const response = await deleteTargetObject(id, authHeader);
+
+      if (!response) {
+        throw new Error('hotdog');
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+
     setFloors(floors?.filter((floor) => floor.floorID !== id));
+    setSelectedFloorID(null);
+    setMapImage(null);
+    setEditable(false);
   };
+
+  const publishedFloor = async () => {
+    if (!buildingID)
+      throw new Error('Could not published building. Please try again.');
+
+    if (!authHeader) {
+      console.error("Authorization header is missing.");
+      alert("Authorization header is missing. Please log in again.");
+      return;
+    }
+
+    setLoading(true); // Start loading
+    try {
+      const isPublished = await publishedBuilding(buildingID, authHeader);
+
+      if (isPublished) {
+        console.log('Building published successfully.');
+        setOpenConfirmatory(isPublished);
+      } else {
+        console.error('Failed to publish the building.');
+      }
+    } catch (error) {
+      console.error('Error publishing building:', error);
+    } finally {
+      setLoading(false);
+    }
+
+
+  }
 
   // default loads
 
@@ -719,6 +841,18 @@ const CanvasEditor = () => {
     };
   }, [editable]);
 
+  useEffect(() => {
+    if (published) {
+      setOpenConfirmatory(true);
+    }
+  }, [published])
+
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    initializeApiToasts(showToast);
+  }, [showToast])
+
   /**
    * Component that renders a user interface for managing building floors and pins on a map.
    * 
@@ -757,7 +891,7 @@ const CanvasEditor = () => {
         {/* SIDE BAR */}
         <div className="w-[250px] border-r-1 flex flex-col h-full bg-white">
           <div className="p-3 text-center border-b-1 border-gray-300 flex flex-row gap-2">
-            <button className="cursor-pointer">
+            <button className="cursor-pointer" onClick={() => handleHistoryPush()}>
               <FontAwesomeIcon icon={faCircleArrowLeft} color={COLORS.BLUE} className="text-2xl" />
             </button>
             <h1 className="font-semibold text-xl">{buildingName} - {floorCount}</h1>
@@ -774,6 +908,7 @@ const CanvasEditor = () => {
               className="bg-yellow-600 px-6 py-2 rounded-lg text-white font-semibold tracking-wider cursor-pointer hover:bg-yellow-700 w-[150px]"
               data-tooltip-id="publish-btn"
               data-tooltip-content="Publish to live users"
+              onClick={() => publishedFloor()}
             >
               Publish
             </button>
@@ -790,7 +925,7 @@ const CanvasEditor = () => {
                   floorName={floor.floorName}
                   floorID={floor.floorID!}
                   floorNumber={floor.floorNumber}
-                  onDelete={handleDeleteFloor}
+                  onDelete={() => handleDeleteFloor(selectedFloorID!)}
                   onSelect={() => handleSelectFloor(floor.floorID!)} // Pass floorID to select
                   layers={layers.filter((layer) => layer.floorID === floor.floorID)}
                   selected={selectedFloorID === floor.floorID}
@@ -810,7 +945,7 @@ const CanvasEditor = () => {
                       className={`flex justify-center items-center flex-col p-3 hover:bg-gray-200 cursor-pointer gap-1 rounded min-w-[75px] ${isHelpModalOpen ? "bg-gray-200" : "bg-white"}`}
                     >
                       <FontAwesomeIcon icon={faBuilding} color={COLORS.BLUE} className="text-xl" />
-                      <h3 className="text-blue-950 font-semibold">Project</h3>
+                      <h3 className="text-blue-950 font-semibold">Floor</h3>
                     </button>
                     <button
                       className={`flex justify-center items-center flex-col p-3 hover:bg-gray-200 cursor-pointer gap-1 rounded min-w-[75px] ${editable ? "bg-gray-200" : "bg-white"}`}
@@ -842,6 +977,7 @@ const CanvasEditor = () => {
                             onClick={() => handlePinClick(index)}
                             onEdit={() => { setEditingPinIndex(index); setIsPinModalOpen(true) }}
                             onDelete={() => handleDeletePin(index)}
+                            editable={editable}
                           />
                         ))}
                       </div>
@@ -878,6 +1014,11 @@ const CanvasEditor = () => {
       <HelpModal
         isOpen={isHelpModalOpen}
         onClose={() => setIsHelpModalOpen(false)}
+      />
+      <DialogConfirm
+        open={openConfirmatory}
+        onConfirm={() => setOpenConfirmatory(false)}
+        confirmText="Okay"
       />
     </div>
   )

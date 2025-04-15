@@ -1,7 +1,17 @@
 import React from "react";
 import { PinComponentProps } from "../../data/interfaces";
 
-const PinComponent: React.FC<PinComponentProps> = ({ xPercent, yPercent, details, isActive, onClick, onEdit, onDelete }) => {
+const PinComponent: React.FC<PinComponentProps> = ({ xPercent, yPercent, details, isActive, onClick, onEdit, onDelete, editable }) => {
+
+    const onEditHandlerEvent = () => {
+        if (!editable) {
+            alert('Click edit floor on the side buttons before editing this pin.');
+            return;
+        }
+
+        onEdit && onEdit(details!);
+    }
+
     return (
         <div
             className="absolute w-4 h-4 bg-red-500 rounded-full cursor-pointer pointer-events-auto"
@@ -37,15 +47,19 @@ const PinComponent: React.FC<PinComponentProps> = ({ xPercent, yPercent, details
                         />
                     )}
                     <div className="flex justify-end gap-2 mt-2">
-                        <button
-                            className="bg-yellow-500 text-white px-2 py-1 rounded cursor-pointer hover:bg-yellow-700"
-                            onClick={() => onEdit && onEdit(details!)}
-                        >
-                            Edit
-                        </button>
-                        <button className="bg-red-500 text-white px-2 py-1 rounded cursor-pointer hover:bg-red-600" onClick={onDelete}>
-                            Delete
-                        </button>
+                        {editable && (
+                            <>
+                                <button
+                                    className="bg-yellow-500 text-white px-2 py-1 rounded cursor-pointer hover:bg-yellow-700"
+                                    onClick={() => onEditHandlerEvent()}
+                                >
+                                    Edit
+                                </button>
+                                <button className="bg-red-500 text-white px-2 py-1 rounded cursor-pointer hover:bg-red-600" onClick={onDelete}>
+                                    Delete
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
             )}

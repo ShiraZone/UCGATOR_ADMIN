@@ -3,7 +3,7 @@ import React from 'react'
 import { FormEvent, useEffect, useState } from 'react'
 
 // ICONS
-import { faBuilding, } from '@fortawesome/free-solid-svg-icons'
+import { faBuilding, faCircleArrowLeft, } from '@fortawesome/free-solid-svg-icons'
 
 // COMPONENTS
 import NavigationBar from '../../components/NavigationBar'
@@ -21,6 +21,9 @@ import useAuthHeader from 'react-auth-kit/hooks/useAuthHeader';
 // INTERFACE
 import { Building } from '../../data/types'
 import { useLoading } from '../../context/LoadingProvider'
+import { ToastType, useToast } from '@/context/ToastProvider'
+import { initializeApiToasts } from '@/config/apiClient'
+import { COLORS } from '@/constant/COLORS'
 
 const CanvasHistoryComponent = ({
     buildingID,
@@ -31,12 +34,7 @@ const CanvasHistoryComponent = ({
     const navigate = useNavigate();
 
     const handleClick = () => {
-        if(published) {
-            alert('Cannot edit published buildings for now.');
-            return;
-        }
-
-        const uri = `/editor/${buildingID}?building_name=${encodeURIComponent(buildingName)}&count_floor=${floorCount}`;
+        const uri = `/editor/${buildingID}?building_name=${encodeURIComponent(buildingName)}&count_floor=${floorCount}&status=${published}`;
         navigate(uri);
     };
 
@@ -61,32 +59,53 @@ const CanvasRoot = () => {
     const [saveBldgs, setSaveBldgs] = useState<Building[]>([]);
     // LOADING MANAGEMENT
     const { setLoading } = useLoading();
+    // TOAST CONTEXT
+    const { showToast } = useToast();
+
+    useEffect(() => {
+        initializeApiToasts(showToast);
+    }, [showToast])
 
     const submitNameHandler = async (e: FormEvent) => {
         e.preventDefault();
         const buildinginput = document.getElementById('bldgName') as HTMLInputElement;
         const floorinput = document.getElementById('floorCnt') as HTMLInputElement;
 
+        buildinginput.classList.remove('border', 'border-red-500');
+        floorinput.classList.remove('border', 'border-red-500');
+
         const rawBuildingName = buildinginput.value.trim();
         const rawFloorCount = parseInt(floorinput.value.trim(), 10);
 
+        let hasError = false;
+
         if (!rawBuildingName) {
-            alert('Please enter a building name');
-            return;
+            showToast('Please enter a building name.', ToastType.ERROR);
+            buildinginput.classList.add('border', 'border-red-500');
+            hasError = true;
         }
+
+        if (!rawFloorCount) {
+            showToast('Please enter a valid floor count.', ToastType.ERROR);
+            floorinput.classList.add('border', 'border-red-500');
+            hasError = true;
+        }
+
+        if (hasError) return;
 
         setLoading(true, 'Loading...');
         try {
             const encodedName = encodeURIComponent(rawBuildingName!);
-            const buildingID = await createBuildingHandler(rawBuildingName, rawFloorCount);
-    
-            const uri = `/editor/${buildingID}?building_name=${encodedName}&count_floor=${rawFloorCount}`;
-    
-            if(buildingID) {
+            const { buildingID, isPublished } = await createBuildingHandler(rawBuildingName, rawFloorCount);
+
+            const uri = `/editor/${buildingID}?building_name=${encodedName}&count_floor=${rawFloorCount}&status=${isPublished}`;
+
+            if (buildingID) {
                 navigateToCanvasHandler(uri);
             }
         } catch (error: any) {
             console.error(error);
+            throw error;
         } finally {
             setLoading(false);
         }
@@ -94,7 +113,7 @@ const CanvasRoot = () => {
 
     const createBuildingHandler = async (rawBuildingName: string, rawFloorCount: number) => {
         try {
-            const response = await axios.post(`${url}/canvas/create-bldg`, 
+            const response = await axios.post(`${url}/canvas/create-bldg`,
                 {
                     rawBuildingName,
                     rawFloorCount
@@ -104,18 +123,15 @@ const CanvasRoot = () => {
                         Authorization: authHeader
                     }
                 }
-            )
-
-            if(!response.data.success) {
-                console.error(response.data.error);
-            }
+            );
 
             const buildingID = response.data.building._id;
+            const isPublished = response.data.building.published;
 
-            return buildingID;
+            return { buildingID, isPublished };
         } catch (error: any) {
-            console.error(error || error.response?.data?.error);
-            alert(error.response?.data?.handler);
+            console.error(error);
+            throw error;
         }
     }
 
@@ -141,7 +157,7 @@ const CanvasRoot = () => {
     }
 
     const navigateToCanvasHandler = (uri: string) => {
-        if(!uri) {
+        if (!uri) {
             console.error('URI not found.')
             return;
         }
@@ -155,6 +171,10 @@ const CanvasRoot = () => {
         </React.Suspense>
     }
 
+    const handleHistoryPush = () => {
+        navigate('/')
+    }
+
     useEffect(() => {
         setLoading(true, 'Loading Data...');
         try {
@@ -164,13 +184,16 @@ const CanvasRoot = () => {
         } finally {
             setLoading(false);
         }
-        
+
     }, []);
 
     return (
         <div className="bg-gray-50 w-full h-screen">
             <NavigationBar />
             <div className='h-[calc(100%-4rem)] flex flex-col items-center justify-start space-y-4 p-10'>
+                <button className="cursor-pointer absolute top-20 left-5" onClick={() => handleHistoryPush()}>
+                    <FontAwesomeIcon icon={faCircleArrowLeft} color={COLORS.BLUE} className="text-2xl" />
+                </button>
                 <div className='flex flex-col gap-4 items-center justify-center border-b-1 border-gray-400/90 w-full px-2 py-5'>
                     <input type="text" id="bldgName" name="bldgName" placeholder="Building Name" className='block w-56 max-w-100 min-w-75 rounded-md py-2 px-3 ring-1 ring-inset ring-gray-400 focus:text-gray-800' required />
                     <input type="number" id="floorCnt" name="floorCnt" placeholder="Floor Count" className='block w-56 max-w-100 min-w-75 rounded-md py-2 px-3 ring-1 ring-inset ring-gray-400 focus:text-gray-800' required />
@@ -189,7 +212,7 @@ const CanvasRoot = () => {
                                     buildingID={building.buildingID}
                                     buildingName={building.buildingName}
                                     floorCount={building.floorCount}
-                                    published={false}
+                                    published={building.published}
                                 />
                             ))
                         ) : (

@@ -2,7 +2,13 @@
 import axios from "axios";
 
 // INTERFACES
-import { FloorData } from "../data/types";
+import { FloorData, RawFloorData } from "@/data/types";
+
+import apiClient from "@/config/apiClient";
+
+
+import { ApiResponse } from '@/data/types';
+import { FloorDataResponse } from "@/data/interfaces";
 
 let url = import.meta.env.VITE_API_URL;
 
@@ -68,7 +74,7 @@ export const createFloorHandler = async (floorData: FloorData, authHeader: strin
         });
 
         // Validate the response
-        if(!response.data.success) {
+        if (!response.data.success) {
             console.error('Failed to create floor.');
             return;
         }
@@ -77,13 +83,11 @@ export const createFloorHandler = async (floorData: FloorData, authHeader: strin
         const currentFloor = response.data.curfloor;
         const currentHistory = response.data.history;
 
-        console.log(currentFloor);
-
         // Return response data.
         return { currentFloor, currentHistory };
     } catch (error: any) {
         // Log the error for debugging purposes.
-        console.error('Error creating floor: ', error || error.response?.data?.error);
+        console.error(error);
         // throw error or create user-friendly message.
         throw error;
     }
@@ -113,22 +117,23 @@ export const createFloorHandler = async (floorData: FloorData, authHeader: strin
  * @property {Array} pin - Array of points of interest on this floor.
  */
 export const loadFloorHandler = async (buildingID: string | undefined, authHeader: string): Promise<object[] | null> => {
+    if(!buildingID)
+        throw new Error('Building id is requried.');
+    
     try {
-        // Placeholder implementation
-
-        const response = await axios.get(`${url}/canvas/load-floor`, {
+        const response = await apiClient.get<ApiResponse<FloorDataResponse>>(`${url}/canvas/load-floor`, {
             params: { buildingID },
             headers: {
                 Authorization: authHeader
             }
         });
 
-        if(!response.data.success) {
+        if (!response.data.success) {
             console.error('Failed to load data.');
             return null;
         }
 
-        const floorData: FloorData[] = (response.data.floorData as any[]).map((item): FloorData => ({
+        const floorData: FloorData[] = (response.data.floorData as RawFloorData[]).map((item): FloorData => ({
             buildingID: buildingID,
             floorID: item._id,
             floorName: item.floorName,
@@ -145,7 +150,7 @@ export const loadFloorHandler = async (buildingID: string | undefined, authHeade
         return floorData;
     } catch (error: any) {
         // Log the error for debugging purposes.
-        console.error('Error loading floor: ', error || error.response?.data?.error);
+        console.error(error);
         // throw error or create user-friendly message.
         throw error;
     }
@@ -174,11 +179,11 @@ export const loadFloorHandler = async (buildingID: string | undefined, authHeade
  * );
  */
 export const setPinHandler = async (buildingID: string | undefined, authHeader: string, floorID: string, pins: any[], toDeletePin: string[]): Promise<boolean> => {
-    
-    console.log(pins);
+    if (buildingID)
+        throw new Error('Building id is required.');
 
     try {
-        const response = await axios.post(`${url}/canvas/update-pin`,
+        const response = await apiClient.post<ApiResponse<boolean>>(`${url}/canvas/update-pin`,
             {
                 buildingID,
                 floorID,
@@ -193,16 +198,50 @@ export const setPinHandler = async (buildingID: string | undefined, authHeader: 
             }
         )
 
-        if(!response.data.success) {
-            console.error(`Fail to save pin details: ${response?.data?.error}`);
-            return false;
-        }
-
-        // Return response data.
-        return true;
+        return response.data.success;
     } catch (error: any) {
         // Log the error for debugging purposes.
-        console.error('Error creating floor: ', error || error.response?.data?.error);
+        console.error(error);
+        // throw error or create user-friendly message.
+        throw error;
+    }
+}
+
+export const deleteTargetObject = async (targetID: string, authHeader: string): Promise<boolean> => {
+    if (targetID)
+        throw new Error('Floor id is required.');
+
+    try {
+        const response = await apiClient.delete<ApiResponse<boolean>>(`${url}/canvas/data/delete-object/${targetID}`, {
+            headers: {
+                Authorization: authHeader
+            }
+        })
+
+        return response.data.success;
+    } catch (error: any) {
+        // Log the error for debugging purposes.
+        console.error(error);
+        // throw error or create user-friendly message.
+        throw error;
+    }
+}
+
+export const publishedBuilding = async (buildingID: string, authHeader: string): Promise<boolean> => {
+    if (!buildingID)
+        throw new Error('Building id is required.');
+
+    try {
+        const response = await apiClient.post<ApiResponse<boolean>>(`${url}/canvas/publish/${buildingID}`, {}, {
+            headers: {
+                Authorization: authHeader
+            }
+        });
+
+        return response.data.success;
+    } catch (error: any) {
+        // Log the error for debugging purposes.
+        console.error(error);
         // throw error or create user-friendly message.
         throw error;
     }

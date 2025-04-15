@@ -17,11 +17,21 @@ export type Pins = {
 
 export type FloorData = {
     buildingID: string | null | undefined;
-    floorID: string | null;
+    floorID: string | null | undefined;
     floorName: string;
     floorNumber: number;
     floorImage?: null | string;
     pin?: Pins[] | null;
+    updatedAt: string;
+}
+
+export type RawFloorData = {
+    _id: string | null | undefined;
+    floorID: string | null | undefined;
+    floorName: string;
+    floorNumber: number;
+    floorImage?: null | string;
+    pois: Pins[] | null;
     updatedAt: string;
 }
 
@@ -36,4 +46,24 @@ export type Building = {
     buildingName: string;
     floorCount: string;
     published: boolean;
+}
+
+export interface ApiResponse<T = any> {
+    floorData: RawFloorData[];
+    success: boolean;
+    message?: string;
+    data?: T;
+    error?: string;
+}
+
+export interface PaginatedResponse<T> extends ApiResponse<T> {
+    page: number;
+    totalPages: number;
+    totalItems: number;
+}
+
+export interface ErrorResponse {
+    statusCode: number;
+    error: string;
+    message: string;
 }
