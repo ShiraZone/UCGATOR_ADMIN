@@ -1,8 +1,5 @@
-// COLORS
-import { COLORS } from "../../constant/COLORS";
-
 // ICONS
-import { faBuilding, faPencil, faLocationDot } from "@fortawesome/free-solid-svg-icons";
+import { faBuilding, faLocationDot } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Link } from "react-router-dom";
 

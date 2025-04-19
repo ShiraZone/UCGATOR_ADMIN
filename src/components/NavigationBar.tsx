@@ -1,5 +1,3 @@
-import { Link } from "react-router-dom"
-
 import IMAGE from "../constant/IMAGES"
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"

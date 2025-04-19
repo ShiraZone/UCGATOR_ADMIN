@@ -36,7 +36,6 @@ import GlobalLoadingIndicator from './(root)/view/GlobalLoadingIndicator.tsx';
 import SystemUser from './(root)/home/SystemUser.tsx';
 import AdminUser from './(root)/home/AdminUser.tsx';
 import ListAnnouncement from './(root)/home/ListAnnouncement.tsx';
-import CreateAnnouncement from './(root)/home/CreateAnnouncement.tsx';
 
 function LoginWithGuard() {
   const isAuthenticated = useIsAuthenticated();

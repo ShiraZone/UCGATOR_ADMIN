@@ -179,6 +179,7 @@ const AnnouncementModal: React.FC<AnnouncementModalProps> = ({
       console.error('Error publishing announcement:', error);
       // Show more detailed error message
       const errorMessage = error.response?.data?.message || error.message || 'Failed to create announcement';
+      console.log(errorMessage);
       // showToast(errorMessage, ToastType.ERROR);
     } finally {
       setLoading(false);
