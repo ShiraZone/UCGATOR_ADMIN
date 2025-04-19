@@ -56,33 +56,40 @@ apiClient.interceptors.response.use(
             return apiClient(originalRequest);
         }
 
-        
-
         if (showToastFunction) {
-            const errorMessage = error.response?.data?.error || error.message || 'An unknown error occured';
+            let message;
+            const errorMessage = error.response?.data || error.message || 'An unknown error occurred';
 
+            if (typeof errorMessage === 'string' && errorMessage.includes('<!DOCTYPE html>')) {
+                const matches = errorMessage.match(/<pre>Error: (.*?)<br>/);
+                message = matches ? matches[1] : 'An error occurred while parsing the response';
+            } else {
+                message = typeof errorMessage === 'string' ? errorMessage : 'An unknown error occurred';
+            }
             let toastType = ToastType.ERROR;
 
             if (error.response) {
                 if (error.response.status === 404) {
-                    toastType = ToastType.WARNING
-                } else if (error.request.status === 401 || error.response.status === 403) {
+                    toastType = ToastType.WARNING;
+                } else if (error.response.status === 401 || error.response.status === 403) {
                     toastType = ToastType.INFO;
-                    // Redirect to login page in case of login misuse.
+                    // Only redirect for authentication errors
                     window.location.href = '/login';
                 }
             } else if (error.request) {
-                // Returns from a request without response
                 toastType = ToastType.ERROR;
-
             }
-            showToastFunction(errorMessage, toastType);
-        }
-        
-        const status = error.response?.status ?? 500;
-        const message = error.response?.statusText ?? 'Internal Server Error';
 
-        window.location.href = `/error?status=${encodeURIComponent(status)}&message=${encodeURIComponent(message)}`;
+            showToastFunction(message, toastType);
+        }
+
+        // Only redirect to error page for server errors (500s)
+        if (error.response?.status && error.response.status >= 500) {
+            const status = error.response.status;
+            const message = error.response.statusText || 'Internal Server Error';
+            window.location.href = `/error?status=${encodeURIComponent(status)}&message=${encodeURIComponent(message)}`;
+        }
+
         return Promise.reject(error);
     }
 );

@@ -47,7 +47,7 @@ const Login = () => {
         }
     }
 
-    const handleTextChange = (key: keyof typeof formData, value: string) => { 
+    const handleTextChange = (key: keyof typeof formData, value: string) => {
         setFormData({
             ...formData,
             [key]: value
@@ -61,31 +61,49 @@ const Login = () => {
         const email = formData.email;
         const password = formData.password;
 
-        if(!email || !password) {
+        if (!email || !password) {
             setErrorData('Please provide your login credentials.')
             return;
         }
 
-        if(!validEmailFormat(email)) {
+        if (!validEmailFormat(email)) {
             setErrorData('Invalid email')
             return;
         }
 
         setLoading(true, 'Signing in...');
         try {
-            const response = await axios.post(`${url}/auth/sign-in`, { email, password })
+            const response = await axios.post(`${url}/auth/admin/sign-in`, { email, password })
+
+            const { _id, profile, permissions, token } = response.data.data;
 
             if (signIn({
-                auth: { 
-                    token: response.data.value.token,
+                auth: {
+                    token: token,
                     type: "Bearer"
                 },
-                userState: { email: email }
+                userState: {
+                    _id,
+                    email: response.data.data.email,
+                    profile,
+                    permissions,
+                }
             })) {
                 navigate('/')
             }
         } catch (error: any) {
-            console.log(error || error.response?.data?.error);
+            // Access error message from response data
+            const errorMessage = error.response.data;
+
+            // If the response contains HTML (like in your case)
+            if (typeof errorMessage === 'string' && errorMessage.includes('<!DOCTYPE html>')) {
+                // You might need to parse the HTML to extract the specific message
+                const matches = errorMessage.match(/<pre>Error: (.*?)<br>/);
+
+                if (matches && matches[1]) {
+                    setErrorData(`${matches[1]}`);
+                }
+            }
         } finally {
             setLoading(false);
         }
@@ -111,63 +129,63 @@ const Login = () => {
                         {errorData && (
                             <p className="text-red-500 text-sm font-bold italic tracking-wide">{`* ${errorData}`}</p>
                         )}
-                        <div 
+                        <div
                             className="mt-5 w-full">
-                            <div 
+                            <div
                                 className={`mb-5 w-full flex flex-row rounded-md relative ${errorData && !formData.email ? 'border-1 border-red-500' : ''}`}>
-                                <input 
-                                    type="text" 
-                                    id="email" 
-                                    name="email" 
-                                    placeholder="Email" 
-                                    className={`bg-white w-full py-3 px-3 box-border rounded-tl-md rounded-bl-md`} 
-                                    required 
+                                <input
+                                    type="text"
+                                    id="email"
+                                    name="email"
+                                    placeholder="Email"
+                                    className={`bg-white w-full py-3 px-3 box-border rounded-tl-md rounded-bl-md`}
+                                    required
                                     onChange={(e) => handleTextChange("email", e.target.value)}
                                     onKeyDown={handleKeyDown} // Add keydown event listener
-                                    disabled={ loading }
+                                    disabled={loading}
                                 />
-                                <div 
+                                <div
                                     className="bg-blue-800 p-3 rounded-tr-md rounded-br-md"
-                                    >
-                                    <FontAwesomeIcon 
-                                        icon={faUser} 
-                                        style={{ color: "white" }} 
-                                        size="xl" 
+                                >
+                                    <FontAwesomeIcon
+                                        icon={faUser}
+                                        style={{ color: "white" }}
+                                        size="xl"
                                     />
                                 </div>
                             </div>
-                            <div 
+                            <div
                                 className={`mb-5 w-full flex flex-row rounded-md relative ${errorData && !formData.password ? 'border-2 border-red-500' : ''}`}>
-                                <input 
-                                    type="password" 
-                                    id="password" 
-                                    name="password" 
-                                    placeholder="Password" 
-                                    className="bg-white w-full py-3 px-3 box-border rounded-tl-md rounded-bl-md" 
-                                    required 
+                                <input
+                                    type="password"
+                                    id="password"
+                                    name="password"
+                                    placeholder="Password"
+                                    className="bg-white w-full py-3 px-3 box-border rounded-tl-md rounded-bl-md"
+                                    required
                                     onChange={(e) => handleTextChange("password", e.target.value)}
                                     onKeyDown={handleKeyDown} // Add keydown event listener
-                                    disabled={ loading }
+                                    disabled={loading}
                                 />
                                 <div className="bg-blue-800 p-3 rounded-tr-md rounded-br-md">
-                                    <FontAwesomeIcon 
-                                        icon={faLock} 
-                                        style={{ color: "white" }} 
+                                    <FontAwesomeIcon
+                                        icon={faLock}
+                                        style={{ color: "white" }}
                                         size="xl" />
                                 </div>
                             </div>
                         </div>
-                        <button 
-                            className="border-2 border-white rounded-4xl w-full py-3 text-white text-xl font-semibold tracking-wider cursor-pointer hover:bg-white hover:text-black" 
+                        <button
+                            className="border-2 border-white rounded-4xl w-full py-3 text-white text-xl font-semibold tracking-wider cursor-pointer hover:bg-white hover:text-black"
                             onClick={(e) => onSignInEvent(e)}
                         >
-                                LOGIN
+                            LOGIN
                         </button>
                     </div>
                     <div>
-                        <img 
-                            src={IMAGE.UCGatorLogo} 
-                            alt="ucgator_logo.png" 
+                        <img
+                            src={IMAGE.UCGatorLogo}
+                            alt="ucgator_logo.png"
                             className="w-md" />
                     </div>
                 </div>

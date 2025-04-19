@@ -168,7 +168,7 @@ const CanvasEditor = () => {
       return;
     }
 
-    navigate('/canvas')
+    navigate('/campus/map');
   }
 
   // CORRDINATES SYSTEM

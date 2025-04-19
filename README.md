@@ -1,54 +1,88 @@
-# React + TypeScript + Vite
+# UC Gator Admin System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A comprehensive administrative platform for managing UC Gator's campus operations and user management. Built with React, TypeScript, and Vite for optimal performance and developer experience.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **User Management**
+  - Admin user creation and management
+  - Role-based access control (Admin, Editor, Viewer)
+  - User status management (Active, Suspended, Inactive)
+  - Granular permissions system
 
-## Expanding the ESLint configuration
+- **Campus Management**
+  - Interactive campus map
+  - Location pin management
+  - Building editor functionality
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **Dashboard**
+  - Overview of system operations
+  - Quick access to key features
+  - System reports
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+- **Announcement System**
+  - Create and manage announcements
+  - List and view all announcements
+
+## Tech Stack
+
+- React 19
+- TypeScript
+- Vite
+- TailwindCSS
+- React Router DOM
+- React Auth Kit
+- Axios
+- Font Awesome
+- React Toastify
+
+## Getting Started
+
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
+4. Build for production:
+   ```bash
+   npm run build
+   ```
+
+## Environment Variables
+
+Create a `.env` file in the root directory with the following variables:
+
+```
+VITE_API_URL=your_api_url_here
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+This project uses ESLint for code linting. To run the linter:
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
+```bash
+npm run lint
 ```
+
+## Security
+
+- Authentication is handled through React Auth Kit
+- Secure cookie-based session management
+- Role-based access control
+- Protected routes implementation
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a new Pull Request
+
+## License
+
+This project is private and confidential. All rights reserved.

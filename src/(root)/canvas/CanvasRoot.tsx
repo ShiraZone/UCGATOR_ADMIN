@@ -34,7 +34,7 @@ const CanvasHistoryComponent = ({
     const navigate = useNavigate();
 
     const handleClick = () => {
-        const uri = `/editor/${buildingID}?building_name=${encodeURIComponent(buildingName)}&count_floor=${floorCount}&status=${published}`;
+        const uri = `/campus/editor/${buildingID}?building_name=${encodeURIComponent(buildingName)}&count_floor=${floorCount}&status=${published}`;
         navigate(uri);
     };
 

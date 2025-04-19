@@ -3,7 +3,7 @@ import { StrictMode, useEffect } from 'react';
 
 // REACT-DOM & REACT-ROUTER-DOM
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, RouterProvider, useNavigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider, useNavigate } from 'react-router-dom';
 
 // CONTEXT PROVIDER
 import { LoadingProvider, useLoading } from '@/context/LoadingProvider.tsx';
@@ -29,11 +29,14 @@ import ErrorPage from './(root)/view/ErrorPage.tsx';
 import Profile from './(root)/(tabs)/Profile.tsx';
 import Dashboard from './(root)/home/Dashboard.tsx';
 import Campus from './(root)/home/Campus.tsx';
-import ManageUsers from './(root)/home/ManageUsers.tsx';
 import CanvasRoot from './(root)/canvas/CanvasRoot.tsx';
 import CanvasEditor from './(root)/canvas/CanvasEditor.tsx';
 import ProtectedRoute from './(root)/(auth)/ProtectedRoute.tsx';
 import GlobalLoadingIndicator from './(root)/view/GlobalLoadingIndicator.tsx';
+import SystemUser from './(root)/home/SystemUser.tsx';
+import AdminUser from './(root)/home/AdminUser.tsx';
+import ListAnnouncement from './(root)/home/ListAnnouncement.tsx';
+import CreateAnnouncement from './(root)/home/CreateAnnouncement.tsx';
 
 function LoginWithGuard() {
   const isAuthenticated = useIsAuthenticated();
@@ -79,26 +82,69 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <Dashboard />
+        element: <Navigate to="dashboard/overview" replace />
+      },
+      {
+        path: "dashboard",
+        children: [
+          {
+            path: "overview",
+            element: <ProtectedRoute element={<Dashboard />}/>
+          },
+          {
+            path: "reports"
+          },
+        ]
       },
       {
         path: "campus",
-        element: <Campus />
+        children: [
+          {
+            path: "map",
+            element: <ProtectedRoute element={<Campus />} />
+          },
+          {
+            path: "location pins"
+          },
+        ]
       },
       {
-        path: "manage+user",
-        element: <ManageUsers />
+        path: "users",
+        children: [
+          {
+            path: "system users",
+            element: <SystemUser />
+          },
+          {
+            path: "admin users",
+            element: <AdminUser />
+          },
+        ]
+      },
+      {
+        path: "/profile/:id",
+        element: <ProtectedRoute element={<Profile />} />
+      },
+      {
+        path: "/announcement",
+        children: [
+          {
+            path: "list all",
+            element: <ProtectedRoute element={<ListAnnouncement />} />
+          }
+        ]
       }
     ]
   },
+
   {
-    path: "/canvas",
+    path: "/campus/root",
     element: <ProtectedRoute element={<CanvasRoot />} />
   },
   {
-    path: "/editor/:buildingID",
-    element: <CanvasEditor />
-  }
+    path: "/campus/editor/:buildingID",
+    element: <ProtectedRoute element={<CanvasEditor />} />
+  },
 ])
 
 const store = createStore({

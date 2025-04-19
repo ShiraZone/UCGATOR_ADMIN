@@ -67,3 +67,10 @@ export interface ErrorResponse {
     error: string;
     message: string;
 }
+
+export interface IUserData {
+    _id: string,
+    email: string,
+    profile: any,
+    permissions: any,
+}
