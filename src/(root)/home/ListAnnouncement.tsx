@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Announcement } from '../../data/models/Announcement';
 import { useLoading } from '../../context/LoadingProvider';
-import { useToast, ToastType } from '../../context/ToastProvider';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrash, faPlus, faChevronLeft, faChevronRight, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
 import { DialogConfirm } from '../../components/DialogConfirm';

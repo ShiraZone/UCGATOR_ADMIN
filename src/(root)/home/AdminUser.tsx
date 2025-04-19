@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEdit, faTrash, faUserPlus, faShieldAlt, faEllipsisVertical, faTimes, faPause, faPlay, faBan } from '@fortawesome/free-solid-svg-icons';
+import { faUserPlus, faPause, faPlay, faBan } from '@fortawesome/free-solid-svg-icons';
 import AddUserModal from '@/components/AddUserModal';
 import apiClient from '@/config/apiClient';
 import useAuthHeader from 'react-auth-kit/hooks/useAuthHeader';
@@ -58,7 +58,7 @@ const AdminUser = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get('/management/admin/account/user', {
+      const response = await apiClient.get(`${url}/management/admin/account/user`, {
         headers: {
           Authorization: authHeader
         }
@@ -82,7 +82,7 @@ const AdminUser = () => {
 
     setLoading(true);
     try {
-      const response = await apiClient.patch(`/management/admin/account/${userId}/terminate`, {}, {
+      const response = await apiClient.patch(`${url}/management/admin/account/${userId}/terminate`, {}, {
         headers: {
           Authorization: authHeader
         }
@@ -102,7 +102,7 @@ const AdminUser = () => {
 
     setLoading(true);
     try {
-      const response = await apiClient.patch(`/management/admin/account/${userId}/suspend`, {}, {
+      const response = await apiClient.patch(`${url}/management/admin/account/${userId}/suspend`, {}, {
         headers: {
           Authorization: authHeader
         }
@@ -122,7 +122,7 @@ const AdminUser = () => {
 
     setLoading(true);
     try {
-      const response = await apiClient.patch(`/management/admin/account/${userId}/reactivate`, {}, {
+      const response = await apiClient.patch(`${url}/management/admin/account/${userId}/reactivate`, {}, {
         headers: {
           Authorization: authHeader
         }

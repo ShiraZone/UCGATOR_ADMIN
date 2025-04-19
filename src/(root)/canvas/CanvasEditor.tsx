@@ -1016,8 +1016,10 @@ const CanvasEditor = () => {
         onClose={() => setIsHelpModalOpen(false)}
       />
       <DialogConfirm
+        title="Confirmation"
         open={openConfirmatory}
         onConfirm={() => setOpenConfirmatory(false)}
+        onCancel={() => setOpenConfirmatory(false)}
         confirmText="Okay"
       />
     </div>
