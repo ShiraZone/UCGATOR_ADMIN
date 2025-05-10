@@ -26,6 +26,8 @@ interface ToastContextType {
     ) => void;
 }
 
+import 'react-toastify/dist/ReactToastify.css';
+
 const ToastContext = createContext<ToastContextType | null>(null);
 
 const defaultConfig: ToastOptions = {
