@@ -4,17 +4,12 @@ import SideNavBar from "../../components/SideNavBar"
 // REACR-ROUTER
 import { Outlet } from "react-router-dom"
 
-import { useToast } from "@/context/ToastProvider"
-import { initializeApiToasts } from "@/config/apiClient"
-import { useEffect } from "react"
+import { useApiToasts } from "@/hooks/useApiToasts"
 import { TopNavBar } from "@/components/TopNavBar"
 
 const Index = () => {
-    const { showToast } = useToast();
-    
-    useEffect(() => {
-        initializeApiToasts(showToast);
-    }, [showToast])
+    // Use our custom hook to initialize API toasts only once
+    useApiToasts();
 
     return (
         <div className="h-screen flex flex-row">

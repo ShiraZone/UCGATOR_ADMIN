@@ -18,10 +18,23 @@ type ShowToastFunction = (
 
 // This will be initialized from your components
 let showToastFunction: ShowToastFunction | null = null;
+let isInitialized = false;
 
 export const initializeApiToasts = (showToast: ShowToastFunction): void => {
-    showToastFunction = showToast;
+    if (!isInitialized) {
+        showToastFunction = showToast;
+        isInitialized = true;
+        console.log('Toast notification system initialized');
+    }
 };
+
+// Reset function for testing or when the toast provider unmounts
+export const resetApiToasts = (): void => {
+    showToastFunction = null;
+    isInitialized = false;
+    console.log('Toast notification system reset');
+};
+
 export const url = import.meta.env.VITE_API_URL
 const apiClient: AxiosInstance = axios.create({
     baseURL: url,
@@ -58,7 +71,7 @@ apiClient.interceptors.response.use(
 
         if (showToastFunction) {
             let message;
-            const errorMessage = error.response?.data || error.message || 'An unknown error occurred';
+            const errorMessage = error.response?.data?.message || error.message || 'An unknown error occurred';
 
             if (typeof errorMessage === 'string' && errorMessage.includes('<!DOCTYPE html>')) {
                 const matches = errorMessage.match(/<pre>Error: (.*?)<br>/);

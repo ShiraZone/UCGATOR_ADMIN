@@ -29,12 +29,12 @@ const PinComponent: React.FC<PinComponentProps> = ({ xPercent, yPercent, details
                         top: "120%", // Position below the pin
                         left: "50%",
                         transform: "translateX(-50%)",
-                        width: "200px"
+                        width: "350px"
                     }}
                 >
                     <h3 className="text-lg font-semibold">{details.pinName}</h3>
                     <p className="text-sm text-gray-600">
-                        {details.pinDescription && details.pinDescription.length > 100 ? `${details.pinDescription.substring(0, 20)}...` : details.pinDescription};
+                        {details.pinDescription && details.pinDescription.length > 100 ? `${details.pinDescription.substring(0, 20)}...` : details.pinDescription}
                     </p>
                     {details.pinType && (
                         <p className="text-sm text-gray-600 font-medium">Service: {details.pinType}</p>

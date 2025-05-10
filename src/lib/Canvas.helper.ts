@@ -179,7 +179,7 @@ export const loadFloorHandler = async (buildingID: string | undefined, authHeade
  * );
  */
 export const setPinHandler = async (buildingID: string | undefined, authHeader: string, floorID: string, pins: any[], toDeletePin: string[]): Promise<boolean> => {
-    if (buildingID)
+    if (!buildingID)
         throw new Error('Building id is required.');
 
     try {
@@ -244,5 +244,92 @@ export const publishedBuilding = async (buildingID: string, authHeader: string):
         console.error(error);
         // throw error or create user-friendly message.
         throw error;
+    }
+}
+
+/**
+ * Updates the name of a floor.
+ *
+ * @async
+ * @function updateFloorName
+ * @param {string} buildingID - The ID of the building containing the floor.
+ * @param {string} floorID - The ID of the floor to update.
+ * @param {string} newFloorName - The new name for the floor.
+ * @param {string} authHeader - The authorization header for API access.
+ * @returns {Promise<boolean>} Returns true if successful, false otherwise.
+ */
+export const updateFloorName = async (
+    buildingID: string,
+    floorID: string,
+    newFloorName: string,
+    authHeader: string
+): Promise<boolean> => {
+    try {
+        const response = await apiClient.put(
+            `${url}/canvas/floor/name`,
+            {
+                buildingID,
+                floorID,
+                floorName: newFloorName
+            },
+            {
+                headers: {
+                    Authorization: authHeader
+                }
+            }
+        );
+
+        return response.data.success;
+    } catch (error) {
+        console.error('Error updating floor name:', error);
+        return false;
+    }
+};
+
+export const deleteFloor = async (buildingID: string, floorID: string, authHeader: string): Promise<boolean> => {
+    try {
+        const response = await apiClient.delete<ApiResponse<boolean>>(`${url}/canvas/floor/${buildingID}/${floorID}`, {
+            headers: {
+                Authorization: authHeader
+            }
+        });
+
+        return response.data.success;
+    } catch (error) {
+        console.error('Error deleting floor:', error);
+        return false;
+    }
+}
+
+export const updateBuilding = async (buildingID: string, authHeader: string, buildingName: string, floorCount: string): Promise<boolean> => {
+    try {
+        const response = await apiClient.put<ApiResponse<boolean>>(`${url}/canvas/building/${buildingID}`, {
+            buildingName,
+            floorCount: parseInt(floorCount)
+        }, {
+            headers: {
+                Authorization: authHeader
+            }
+        });
+
+        return response.data.success;
+    } catch (error) {
+        console.error('Error updating building:', error);
+        return false;
+    }
+}
+
+export const deleteBuilding = async (buildingID: string, authHeader: string): Promise<boolean> => {
+    try {
+        const response = await apiClient.delete<ApiResponse<boolean>>(`${url}/canvas/building/${buildingID}`, {
+            headers: {
+                Authorization: authHeader
+            }
+        });
+
+        return response.data.success;
+    } catch (error) {
+        console.error('Error deleting building:', error);
+        return false;
     }
 }

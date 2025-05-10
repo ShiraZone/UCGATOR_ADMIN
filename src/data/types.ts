@@ -45,7 +45,7 @@ export type Building = {
     buildingID: string;
     buildingName: string;
     floorCount: string;
-    published: boolean;
+    isLive: boolean;
 }
 
 export interface ApiResponse<T = any> {

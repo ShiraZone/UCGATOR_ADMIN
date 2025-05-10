@@ -7,7 +7,7 @@ import { createBrowserRouter, Navigate, RouterProvider, useNavigate } from 'reac
 
 // CONTEXT PROVIDER
 import { LoadingProvider, useLoading } from '@/context/LoadingProvider.tsx';
-import { ToastPrivder } from '@/context/ToastProvider.tsx';
+import { ToastProvider } from '@/context/ToastProvider.tsx';
 
 // STYLE
 import './index.css'
@@ -157,9 +157,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <LoadingProvider>
       <AuthProvider store={store}>
-        <ToastPrivder>
+        <ToastProvider>
           <AppWrapper />
-        </ToastPrivder>
+        </ToastProvider>
       </AuthProvider>
     </LoadingProvider>
   </StrictMode>

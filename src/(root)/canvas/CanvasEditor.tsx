@@ -76,27 +76,32 @@ import useAuthHeader from 'react-auth-kit/hooks/useAuthHeader';
 // API
 import {
   createFloorHandler,
-  deleteTargetObject,
+  deleteBuilding,
+  deleteFloor,
   loadFloorHandler,
   publishedBuilding,
-  setPinHandler
+  setPinHandler,
+  updateBuilding,
+  updateFloorName
 } from "../../lib/Canvas.helper";
 
 // CONTEXT
 import { useLoading } from "../../context/LoadingProvider";
+import { useToast, ToastType } from "../../context/ToastProvider";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBuilding,
   faCircleArrowLeft,
   faPencil,
-  faQuestionCircle,
+  faPlus,
+  faPrint,
   faSave
 } from "@fortawesome/free-solid-svg-icons";
 import { COLORS } from "../../constant/COLORS";
-import { HelpModal } from "./HelpModal";
 import { Tooltip } from "react-tooltip";
-import { useToast } from "@/context/ToastProvider"
-import { initializeApiToasts } from "@/config/apiClient"
+import { useApiToasts } from "@/hooks/useApiToasts"
+import FloorDetailsModal from "@/components/FloorDetailsModal";
+import BuildingModal from "@/components/BuildingModal";
 
 const useQuery = () => new URLSearchParams(useLocation().search);
 
@@ -105,6 +110,7 @@ const validateFile = (file: File | null): boolean => {
   if (!file.type.startsWith("image/")) {
     console.error("Invalid file type. Please upload an image.");
     alert("Invalid file type. Please upload an image.");
+
     return false;
   }
 
@@ -120,13 +126,13 @@ const CanvasEditor = () => {
 
   // QUERY
   const buildingName = query.get('building_name');
-  const floorCount = query.get('count_floor');
-  const published = query.get('status');
+  const floorCount: number = parseInt(query.get('count_floor')!);
+  const published: boolean = (query.get('status')?.toLowerCase() === 'true') || false;
   // AUTH
   const authHeader = useAuthHeader();
-
   // CONTEXT
   const { setLoading } = useLoading();
+  const { showToast } = useToast();
 
   // LAYERS RELATED
   const [layers, setLayers] = useState<{ floorID: string; layerName: string }[]>([]);
@@ -138,9 +144,7 @@ const CanvasEditor = () => {
   const [selectedFloorID, setSelectedFloorID] = useState<string | null>(null); // Track selected floor
   const [isModalOpen, setIsModalOpen] = useState(false);  // OKAY
   const [floors, setFloors] = useState<FloorData[] | undefined>([]);
-  const [mapImage, setMapImage] = useState<string | null | undefined>(null);
-
-  // PIN RELATED
+  const [mapImage, setMapImage] = useState<string | null | undefined>(null);  // FLOOR & PIN RELATED
   type PinDetails = Pins['details'];
   const [editable, setEditable] = useState<boolean>(false);
   const [newPin, setNewPin] = useState<{ xPercent: number; yPercent: number } | null>(null);
@@ -151,10 +155,15 @@ const CanvasEditor = () => {
   const [pinDetails, setPinDetails] = useState<PinDetails | null>(); // STORE PIN DETAILS OF THE ACTIVE INDEX
   const [mapLoaded, setMapLoaded] = useState<boolean>(false); // STATE FOR MAP TRACKING
   const [toDeletePin, setToDeletPin] = useState<string[]>([]);
-  const [openConfirmatory, setOpenConfirmatory] = useState<boolean>(false);
+  const [openConfirmatory, setOpenConfirmatory] = useState<{ state: boolean; description: string }>({ state: false, description: '' }); // STATE FOR CONFIRMATION DIALOG
   // MODAL RELATED
   const [isPinModalOpen, setIsPinModalOpen] = useState<boolean>(false); // State for pin modal
-  const [isHelpModalOpen, setIsHelpModalOpen] = useState<boolean>(false);
+  const [isFloorDetailsModalOpen, setIsFloorDetailsModalOpen] = useState<boolean>(false);
+  const [editingFloorDetails, setEditingFloorDetails] = useState<Pick<FloorData, 'floorID' | 'floorName'> | null>(null);
+  const [isBuildingModalOpen, setIsBuildingModalOpen] = useState<boolean>(false);
+
+  // Track if there are any unsaved changes
+  const [hasChanges, setHasChanges] = useState<boolean>(false);
 
   // CONFIGURATION RELATED
   const handleHistoryPush = () => {
@@ -265,6 +274,7 @@ const CanvasEditor = () => {
       ])
 
       setPinsByFloor((prev) => [...prev, incomingPin]);
+      setHasChanges(true); // Mark that changes have been made
 
       console.log(pinsByFloor);
       setNewPin(null); // Reset new pin
@@ -332,7 +342,7 @@ const CanvasEditor = () => {
    * @throws {TypeError} Potential error if selectedFloorID is null/undefined or editingPinIndex is invalid.
    */
   const handleEditPin = (updatedDetails: PinDetails): void => {
-    if (selectedFloorID && editingPinIndex) {
+    if (selectedFloorID && editingPinIndex !== null) {
 
       const currentPin = pinsByFloor[editingPinIndex];
 
@@ -371,9 +381,12 @@ const CanvasEditor = () => {
             : layer
         )
       );
+
+      setHasChanges(true); // Mark that changes have been made
     }
 
     setEditingPinIndex(null); // Reset editing index
+    setIsPinModalOpen(false); // Close the modal
     setIsPinModalOpen(false); // Close the modal
   };
 
@@ -432,6 +445,7 @@ const CanvasEditor = () => {
       return prev.filter((_, i) => i !== index || prev[i].floorID !== selectedFloorID);
     });
 
+    setHasChanges(true); // Mark that changes have been made
     setActivePinIndex(null); // Close the popover
   };
 
@@ -480,8 +494,6 @@ const CanvasEditor = () => {
       if (!response) {
         return null;
       }
-
-      console.log('Success');
     } catch (error: any) {
       console.error(error || error.response?.data?.error);
     } finally {
@@ -575,6 +587,7 @@ const CanvasEditor = () => {
 
       setLayers(allLayers);
       setFloors(updatedFloors || []);
+      setHasChanges(false);
 
     } catch (error: any) {
       console.log(error || error.response?.data?.error);
@@ -670,18 +683,23 @@ const CanvasEditor = () => {
    * @requires buildingID - The ID of the building to add the floor to
    */
   const handleAddFloorEvent = async (data: any): Promise<void> => {
+
     const file = data.mapFile && data.mapFile.length > 0 ? data.mapFile[0] : null;
 
     // Validate file
     if (!validateFile(file)) return;
 
+    // Check if floor count exceeds limit
+    if (floors && floors.length >= floorCount) {
+      console.error(`Maximum floor count (${floorCount}) reached.`);
+      alert(`Cannot add more floors. Maximum limit of ${floorCount} floors reached.`);
+      return;
+    }
+
     // Validate floorName and floorNum fields
     if (!data.floorName || !data.floorNum) {
       console.error("Floor name and floor number are required.");
       alert("Please provide both the floor name and floor number.");
-
-
-
       return;
     }
 
@@ -741,28 +759,37 @@ const CanvasEditor = () => {
 
     setLoading(true, 'Deleting Floor.');
     try {
-      // Validate authorization header
+      // Validate buildingID and authorization header
+      if (!buildingID) {
+        console.error("Building ID is missing.");
+        alert("Building ID is missing. Please try again.");
+        return;
+      }
+
       if (!authHeader) {
         console.error("Authorization header is missing.");
         alert("Authorization header is missing. Please log in again.");
         return;
       }
 
-      const response = await deleteTargetObject(id, authHeader);
+      const response = await deleteFloor(buildingID, id, authHeader);
 
       if (!response) {
-        throw new Error('hotdog');
+        throw new Error('Failed to delete floor');
       }
+
+      // Update state to remove the deleted floor
+      setFloors(floors?.filter((floor) => floor.floorID !== id));
+      setSelectedFloorID(null);
+      setMapImage(null);
+      setEditable(false);
     } catch (error) {
-      console.log(error);
+      console.error('Error deleting floor:', error);
+      alert('Failed to delete floor. Please try again.');
     } finally {
       setLoading(false);
+      setHasChanges(true);
     }
-
-    setFloors(floors?.filter((floor) => floor.floorID !== id));
-    setSelectedFloorID(null);
-    setMapImage(null);
-    setEditable(false);
   };
 
   const publishedFloor = async () => {
@@ -781,7 +808,9 @@ const CanvasEditor = () => {
 
       if (isPublished) {
         console.log('Building published successfully.');
-        setOpenConfirmatory(isPublished);
+        setOpenConfirmatory({ state: true, description: 'Building published successfully.' });
+        // Reset changes after successful publishing
+        setHasChanges(false);
       } else {
         console.error('Failed to publish the building.');
       }
@@ -790,30 +819,137 @@ const CanvasEditor = () => {
     } finally {
       setLoading(false);
     }
-
-
   }
+  
+  /**
+   * Handles the editing of a floor name.
+   * 
+   * This function:
+   * - Opens the floor details modal with the current floor details
+   * - Sets the editing floor details in state
+   * 
+   * @param {string} floorID - The ID of the floor to edit
+   * @param {string} floorName - The current name of the floor
+   * @returns {void}
+   */
+  const handleEditFloorRequest = (floorID: string, floorName: string): void => {
+    setEditingFloorDetails({ floorID, floorName });
+    setIsFloorDetailsModalOpen(true);
+  };  /**
+   * Handles saving the updated floor name.
+   * 
+   * This function:
+   * - Calls the API to update the floor name
+   * - Updates the local state with the new floor name
+   * - Shows toast messages for success/failure
+   * - Closes the modal
+   * 
+   * @param {Object} updatedFloor - The updated floor details
+   * @param {string} updatedFloor.floorID - The ID of the floor
+   * @param {string} updatedFloor.floorName - The new name of the floor
+   * @returns {Promise<void>}
+   */
+  const handleUpdateFloorName = async (updatedFloor: { floorID: string; floorName: string }): Promise<void> => {
+    if (!buildingID || !authHeader) {
+      showToast('Missing required information', ToastType.ERROR);
+      return;
+    }
 
-  // default loads
+    setLoading(true, 'Updating floor name...');
+    try {
+      const success = await updateFloorName(
+        buildingID,
+        updatedFloor.floorID,
+        updatedFloor.floorName,
+        authHeader
+      );
+
+      if (success) {
+        // Update local state
+        setFloors((prevFloors) =>
+          prevFloors?.map(floor =>
+            floor.floorID === updatedFloor.floorID
+              ? { ...floor, floorName: updatedFloor.floorName }
+              : floor
+          ) || []
+        );
+
+        showToast('Floor name updated successfully', ToastType.SUCCESS);
+        setHasChanges(true); // Mark that changes have been made
+      } else {
+        showToast('Failed to update floor name', ToastType.ERROR);
+      }
+    } catch (error) {
+      console.error('Error updating floor name:', error);
+      showToast('An error occurred while updating floor name', ToastType.ERROR);
+    } finally {
+      setLoading(false);
+      setIsFloorDetailsModalOpen(false);
+      setEditingFloorDetails(null);
+    }
+  };
+  const handleUpdateBuilding = async (updatedBuilding: { buildingID: string; buildingName: string; floorCount: string; isLive: boolean }) => {
+    if (!buildingID || !authHeader) {
+      showToast('Missing required information', ToastType.ERROR);
+      return;
+    }
+
+    setLoading(true, 'Updating building details...');
+    try {
+      const success = await updateBuilding(
+        buildingID,
+        authHeader,
+        updatedBuilding.buildingName,
+        updatedBuilding.floorCount
+      );
+
+      if (success) {
+        // Update navigation URL to reflect the new building name
+        navigate(`/campus/editor/${buildingID}?building_name=${encodeURIComponent(updatedBuilding.buildingName)}&count_floor=${updatedBuilding.floorCount}&status=${published}`, { replace: true });
+        showToast('Building details updated successfully', ToastType.SUCCESS);
+        setHasChanges(true); // Mark that changes have been made
+      } else {
+        showToast('Failed to update building details', ToastType.ERROR);
+      }
+    } catch (error) {
+      console.error('Error updating building details:', error);
+      showToast('An error occurred while updating building details', ToastType.ERROR);
+    } finally {
+      setLoading(false);
+      setIsBuildingModalOpen(false);
+    }
+  };
+
+  const handleDeleteBuilding = async () => {
+    if (!buildingID || !authHeader) {
+      showToast('Missing required information', ToastType.ERROR);
+      return;
+    }
+
+    setLoading(true, 'Deleting building...');
+    try {
+      const success = await deleteBuilding(buildingID, authHeader);
+
+      if (success) {
+        showToast('Building deleted successfully', ToastType.SUCCESS);
+        // Navigate back to canvas root after deletion
+        navigate('/canvas', { replace: true });
+      } else {
+        showToast('Failed to delete building', ToastType.ERROR);
+      }
+    } catch (error) {
+      console.error('Error deleting building:', error);
+      showToast('An error occurred while deleting building', ToastType.ERROR);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     handleLoadFloorEvent();
+    setHasChanges(false);
   }, [buildingID])
 
-  /**
-   * useEffect hook to manage browser navigation events for unsaved changes.
-   * 
-   * This effect adds event listeners for the `beforeunload` and `popstate` events.
-   * When the user attempts to leave the page or navigate back, it prompts them
-   * with a confirmation dialog if there are unsaved changes (when `editable` is true).
-   * 
-   * The `beforeunload` event prevents the user from closing or refreshing the page
-   * without confirmation, while the `popstate` event handles back navigation.
-   * 
-   * @param {boolean} editable - A flag indicating whether the user is in an editable state.
-   * 
-   * @returns {void} - This effect does not return a value. It sets up and cleans up event listeners.
-   */
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (editable) {
@@ -843,47 +979,12 @@ const CanvasEditor = () => {
 
   useEffect(() => {
     if (published) {
-      setOpenConfirmatory(true);
+      setOpenConfirmatory({ state: true, description: 'Building is already published. Any changes will not be reflected to the live users.' });
     }
   }, [published])
 
-  const { showToast } = useToast();
+  useApiToasts();
 
-  useEffect(() => {
-    initializeApiToasts(showToast);
-  }, [showToast])
-
-  /**
-   * Component that renders a user interface for managing building floors and pins on a map.
-   * 
-   * This component includes a sidebar for navigation and actions related to floors,
-   * as well as a canvas area that displays a map image and associated pins. It provides
-   * functionality to add, edit, and delete floors and pins, as well as publish changes.
-   * 
-   * @component
-   * @param {Object} props - The component props.
-   * @param {string} props.buildingName - The name of the building.
-   * @param {number} props.floorCount - The total number of floors in the building.
-   * @param {Array<FloorData>} props.floors - An array of floor data objects.
-   * @param {Array<LayerData>} props.layers - An array of layer data objects associated with the floors.
-   * @param {Array<PinData>} props.pinsByFloor - An array of pin data objects for the current floor.
-   * @param {string} props.mapImage - The URL of the map image to be displayed.
-   * @param {boolean} props.editable - A flag indicating whether the user can edit the map.
-   * @param {boolean} props.isModalOpen - A flag indicating whether the add floor modal is open.
-   * @param {boolean} props.isPinModalOpen - A flag indicating whether the pin details modal is open.
-   * @param {boolean} props.isHelpModalOpen - A flag indicating whether the help modal is open.
-   * @param {function} props.setIsModalOpen - Function to set the state of the add floor modal.
-   * @param {function} props.setIsPinModalOpen - Function to set the state of the pin details modal.
-   * @param {function} props.setIsHelpModalOpen - Function to set the state of the help modal.
-   * @param {function} props.handleAddFloorEvent - Function to handle adding a new floor.
-   * @param {function} props.handleEditPin - Function to handle editing a pin.
-   * @param {function} props.handleAddPinDetails - Function to handle adding pin details.
-   * @param {function} props.handleDeletePin - Function to handle deleting a pin.
-   * @param {function} props.handleSelectFloor - Function to handle selecting a floor.
-   * @param {function} props.handleSavePins - Function to handle saving pins.
-   * @param {function} props.handleDeleteFloor - Function to handle deleting a floor.
-   * @returns {JSX.Element} The rendered component.
-   */
   return (
     <div className="w-full h-screen select-none">
       <NavigationBar />
@@ -897,23 +998,42 @@ const CanvasEditor = () => {
             <h1 className="font-semibold text-xl">{buildingName} - {floorCount}</h1>
           </div>
           {/* BUTTON */}
-          <div className="p-3 text-center border-b-1 border-gray-300">
-            <button className="bg-yellow-600 px-8 py-2 rounded-lg text-white font-semibold tracking-wider cursor-pointer hover:bg-yellow-700 w-[150px]" onClick={() => setIsModalOpen(true)}>
-              Add Floor
-            </button>
-          </div>
-          {/* BUTTON */}
-          <div className="p-3 text-center border-b-1 border-gray-300 gap-2 flex justify-center">
+          <div className="p-3 text-center border-b-1 border-gray-300 flex flex-row justify-around gap-2">
             <button
-              className="bg-yellow-600 px-6 py-2 rounded-lg text-white font-semibold tracking-wider cursor-pointer hover:bg-yellow-700 w-[150px]"
-              data-tooltip-id="publish-btn"
-              data-tooltip-content="Publish to live users"
-              onClick={() => publishedFloor()}
+              className={`px-5 py-2 rounded-lg text-white font-semibold tracking-wider ${floors && floors.length < floorCount
+                ? 'bg-yellow-600 cursor-pointer hover:bg-yellow-700'
+                : 'bg-gray-400 cursor-not-allowed'
+                }`}
+              onClick={() => floors && floors.length < floorCount && setIsModalOpen(true)}
+              data-tooltip-id="add-floor-btn"
+              data-tooltip-content={
+                floors && floors.length < floorCount
+                  ? "Add a new floor"
+                  : `Maximum floor count (${floorCount}) reached`
+              }
             >
-              Publish
+              <FontAwesomeIcon icon={faPlus} color="white" className="text-lg" />
             </button>
+            <button
+              className={`px-5 py-2 rounded-lg text-white font-semibold tracking-wider ${hasChanges ? 'bg-yellow-600 cursor-pointer hover:bg-yellow-700' : 'bg-gray-400 cursor-not-allowed'}`}
+              data-tooltip-id="publish-btn"
+              data-tooltip-content={hasChanges ? "Publish to live users" : "No changes to publish"}
+              onClick={() => hasChanges && publishedFloor()}
+              disabled={!hasChanges}
+            >
+              <FontAwesomeIcon icon={faPrint} color="white" className="text-lg" />
+            </button>
+            <button
+              className={`px-5 py-2 rounded-lg text-white font-semibold tracking-wider bg-yellow-600 cursor-pointer hover:bg-yellow-700`}
+              data-tooltip-id="building-btn"
+              data-tooltip-content={"Edit building details"}
+              onClick={() => setIsBuildingModalOpen(true)}
+            >
+              <FontAwesomeIcon icon={faBuilding} color="white" className="text-lg" />
+            </button>
+            <Tooltip id="add-floor-btn" className="z-150" />
             <Tooltip id="publish-btn" className="z-150" />
-            <Tooltip id="save-btn" className="z-150" />
+            <Tooltip id="building-btn" className="z-150" />
           </div>
           {/* LAYER LIST */}
           <div className="px-2 py-3 max-h-[1000px] overflow-auto scrollbar-hide">
@@ -925,8 +1045,7 @@ const CanvasEditor = () => {
                   floorName={floor.floorName}
                   floorID={floor.floorID!}
                   floorNumber={floor.floorNumber}
-                  onDelete={() => handleDeleteFloor(selectedFloorID!)}
-                  onSelect={() => handleSelectFloor(floor.floorID!)} // Pass floorID to select
+                  onSelect={() => handleSelectFloor(floor.floorID!)}
                   layers={layers.filter((layer) => layer.floorID === floor.floorID)}
                   selected={selectedFloorID === floor.floorID}
                 />
@@ -942,7 +1061,8 @@ const CanvasEditor = () => {
                 <div className="overflow-auto flex-1 relative" >
                   <div className="max-w-fit max-h-fit m-2 p-2 bg-white z-15 absolute rounded-md justify-around items-center gap-3">
                     <button
-                      className={`flex justify-center items-center flex-col p-3 hover:bg-gray-200 cursor-pointer gap-1 rounded min-w-[75px] ${isHelpModalOpen ? "bg-gray-200" : "bg-white"}`}
+                      className={`flex justify-center items-center flex-col p-3 hover:bg-gray-200 cursor-pointer gap-1 rounded min-w-[75px] ${isFloorDetailsModalOpen ? "bg-gray-200" : "bg-white"}`}
+                      onClick={() => handleEditFloorRequest(selectedFloorID!, floors.find(floor => floor.floorID === selectedFloorID!)?.floorName!)}
                     >
                       <FontAwesomeIcon icon={faBuilding} color={COLORS.BLUE} className="text-xl" />
                       <h3 className="text-blue-950 font-semibold">Floor</h3>
@@ -953,13 +1073,6 @@ const CanvasEditor = () => {
                     >
                       <FontAwesomeIcon icon={editable ? faSave : faPencil} color={COLORS.BLUE} className="text-xl" />
                       <h3 className="text-blue-950 font-semibold">{`${editable ? "Save" : "Edit"}`}</h3>
-                    </button>
-                    <button
-                      className={`flex justify-center items-center flex-col p-3 hover:bg-gray-200 cursor-pointer gap-1 rounded min-w-[75px] ${isHelpModalOpen ? "bg-gray-200" : "bg-white"}`}
-                      onClick={() => setIsHelpModalOpen(true)}
-                    >
-                      <FontAwesomeIcon icon={faQuestionCircle} color={COLORS.BLUE} className="text-xl" />
-                      <h3 className="text-blue-950 font-semibold">Help</h3>
                     </button>
                   </div>
                   <div className={`w-[1280px] max-h-[auto] mx-30 my-10 relative ${editable ? "cursor-pointer" : ""}`}>
@@ -975,7 +1088,11 @@ const CanvasEditor = () => {
                             details={pin.details}
                             isActive={activePinIndex === index}
                             onClick={() => handlePinClick(index)}
-                            onEdit={() => { setEditingPinIndex(index); setIsPinModalOpen(true) }}
+                            onEdit={() => {
+                              setEditingPinIndex(index);
+                              setPinDetails(pin.details);
+                              setIsPinModalOpen(true);
+                            }}
                             onDelete={() => handleDeletePin(index)}
                             editable={editable}
                           />
@@ -988,7 +1105,7 @@ const CanvasEditor = () => {
             )}
           </>
         ) : (
-          <h1>No map Image available</h1>
+          <h1 className="text-center">No map Image available</h1>
         )}
       </div>
       <ModalDialog
@@ -1001,6 +1118,16 @@ const CanvasEditor = () => {
         onClose={() => {
           setIsPinModalOpen(false);
           setEditingPinIndex(null);
+          if (newPin) {
+            // Reset pin details only if adding a new pin
+            setPinDetails({
+              floorID: selectedFloorID!,
+              pinName: "",
+              pinType: "",
+              pinDescription: "",
+              pinImage: null
+            });
+          }
         }}
         onSave={(pinDetails) => {
           if (editingPinIndex !== null) {
@@ -1011,16 +1138,31 @@ const CanvasEditor = () => {
         }}
         initdetails={pinDetails!}
       />
-      <HelpModal
-        isOpen={isHelpModalOpen}
-        onClose={() => setIsHelpModalOpen(false)}
-      />
       <DialogConfirm
         title="Confirmation"
-        open={openConfirmatory}
-        onConfirm={() => setOpenConfirmatory(false)}
-        onCancel={() => setOpenConfirmatory(false)}
+        open={openConfirmatory.state}
+        description={openConfirmatory.description}
+        onConfirm={() => setOpenConfirmatory({ state: false, description: '' })}
         confirmText="Okay"
+      />
+      <FloorDetailsModal
+        isOpen={isFloorDetailsModalOpen}
+        onDelete={handleDeleteFloor}
+        onClose={() => setIsFloorDetailsModalOpen(false)}
+        onSave={handleUpdateFloorName}
+        floorDetails={editingFloorDetails || undefined}
+      />
+      <BuildingModal
+        isOpen={isBuildingModalOpen}
+        onClose={() => setIsBuildingModalOpen(false)}
+        onSave={handleUpdateBuilding}
+        buildingDetails={{
+          buildingID: buildingID!,
+          buildingName: buildingName!,
+          floorCount: floorCount.toString(),
+          isLive: published
+        }}
+        onDelete={handleDeleteBuilding}
       />
     </div>
   )

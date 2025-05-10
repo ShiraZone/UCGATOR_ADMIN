@@ -22,19 +22,19 @@ import useAuthHeader from 'react-auth-kit/hooks/useAuthHeader';
 import { Building } from '../../data/types'
 import { useLoading } from '../../context/LoadingProvider'
 import { ToastType, useToast } from '@/context/ToastProvider'
-import { initializeApiToasts } from '@/config/apiClient'
+import { useApiToasts } from '@/hooks/useApiToasts'
 import { COLORS } from '@/constant/COLORS'
 
 const CanvasHistoryComponent = ({
     buildingID,
     buildingName,
     floorCount,
-    published
+    isLive
 }: Building) => {
     const navigate = useNavigate();
 
     const handleClick = () => {
-        const uri = `/campus/editor/${buildingID}?building_name=${encodeURIComponent(buildingName)}&count_floor=${floorCount}&status=${published}`;
+        const uri = `/campus/editor/${buildingID}?building_name=${encodeURIComponent(buildingName)}&count_floor=${floorCount}&status=${isLive}`;
         navigate(uri);
     };
 
@@ -43,7 +43,7 @@ const CanvasHistoryComponent = ({
     return (
         <div id={buildingID} className='min-w-[300px] min-h-[150px] max-h-[200px] relative rounded-2xl border-1 p-3 cursor-pointer hover:bg-gray-200 transform transition-transform duration-300 hover:scale-105' onClick={handleClick}>
             <h3>{buildingName} - {floorCount}</h3>
-            <h3>{published ? 'PUBLISHED' : ''}</h3>
+            <h3>{isLive ? 'PUBLISHED' : ''}</h3>
         </div>
     )
 }
@@ -62,9 +62,8 @@ const CanvasRoot = () => {
     // TOAST CONTEXT
     const { showToast } = useToast();
 
-    useEffect(() => {
-        initializeApiToasts(showToast);
-    }, [showToast])
+    // Use our custom hook to initialize API toasts only once
+    useApiToasts();
 
     const submitNameHandler = async (e: FormEvent) => {
         e.preventDefault();
@@ -98,7 +97,7 @@ const CanvasRoot = () => {
             const encodedName = encodeURIComponent(rawBuildingName!);
             const { buildingID, isPublished } = await createBuildingHandler(rawBuildingName, rawFloorCount);
 
-            const uri = `/editor/${buildingID}?building_name=${encodedName}&count_floor=${rawFloorCount}&status=${isPublished}`;
+            const uri = `/campus/editor/${buildingID}?building_name=${encodedName}&count_floor=${rawFloorCount}&status=${isPublished}`;
 
             if (buildingID) {
                 navigateToCanvasHandler(uri);
@@ -149,7 +148,7 @@ const CanvasRoot = () => {
                 buildingID: building._id,
                 buildingName: building.buildingName,
                 floorCount: building.floorCount,
-                published: building.published
+                isLive: building.isLive
             })));
         } catch (error: any) {
             console.error(error || error.response?.data?.error);
@@ -212,7 +211,7 @@ const CanvasRoot = () => {
                                     buildingID={building.buildingID}
                                     buildingName={building.buildingName}
                                     floorCount={building.floorCount}
-                                    published={building.published}
+                                    isLive={building.isLive}
                                 />
                             ))
                         ) : (

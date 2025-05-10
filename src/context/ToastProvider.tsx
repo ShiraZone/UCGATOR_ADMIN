@@ -15,7 +15,7 @@ export enum ToastType {
     SUCCESS = 'success',
     ERROR = 'error',
     INFO = 'info',
-    WARNING = 'wraning',
+    WARNING = 'warning',
 }
 
 interface ToastContextType {
@@ -42,7 +42,7 @@ interface ToastProviderProps {
     children: ReactNode
 }
 
-export const ToastPrivder: React.FC<ToastProviderProps> = ({ children }) => {
+export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     const showToast = (
         message: string,
         type: ToastType = ToastType.INFO,
