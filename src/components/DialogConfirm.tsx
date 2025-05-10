@@ -6,6 +6,7 @@ interface DialogProps {
     title: string
     description?: string
     onConfirm: () => void
+    onCancel: () => void
     confirmText?: string
 }
 
@@ -14,6 +15,7 @@ export const DialogConfirm = ({
     title,
     description,
     onConfirm,
+    onCancel,
     confirmText = "Confirm",
 }: DialogProps) => {
     if (!open) return null;
@@ -27,6 +29,9 @@ export const DialogConfirm = ({
                 </div>
                 {description && <p className="mb-4 text-sm text-gray-600">{description}</p>}
                 <div className="flex justify-end gap-2">
+                    <button onClick={() => {}} className="px-4 py-2 rounded bg-gray-300 text-gray-700 hover:bg-gray-400 cursor-pointer">
+                        Cancel
+                    </button>
                     <button onClick={onConfirm} className="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700 cursor-pointer">
                         {confirmText}
                     </button>

@@ -1142,6 +1142,7 @@ const CanvasEditor = () => {
         title="Confirmation"
         open={openConfirmatory.state}
         description={openConfirmatory.description}
+        onCancel={() => setOpenConfirmatory({ state: false, description: '' })}
         onConfirm={() => setOpenConfirmatory({ state: false, description: '' })}
         confirmText="Okay"
       />

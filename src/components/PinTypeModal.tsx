@@ -16,10 +16,9 @@ import { ConfirmDialog } from "./DialogComponent";
 interface PinTypeModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSelectPinType: (pinType: string) => void;
 }
 
-const PinTypeModal = ({ isOpen, onClose, onSelectPinType }: PinTypeModalProps) => {
+const PinTypeModal = ({ isOpen, onClose }: PinTypeModalProps) => {
     // Initial pin types - just names
     const initialPinTypes = [
         "Cashier",
