@@ -69,8 +69,27 @@ export interface ErrorResponse {
 }
 
 export interface IUserData {
-    _id: string,
-    email: string,
-    profile: any,
-    permissions: any,
+    _id: string;
+    email: string;
+    profile: {
+        avatar: string;
+        firstName: string;
+        middleName?: string;
+        lastName: string;
+        fullName: string;
+    };
+    permissions: {
+        role: 'admin' | 'editor' | 'viewer';
+        modules: {
+            [key: string]: {
+                view: boolean;
+                create: boolean;
+                edit: boolean;
+                delete: boolean;
+            };
+        };
+    };
+    status: 'active' | 'suspended' | 'inactive';
+    dateCreated: string;
+    lastLogin?: string;
 }

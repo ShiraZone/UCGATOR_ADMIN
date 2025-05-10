@@ -123,14 +123,6 @@ const AnnouncementModal: React.FC<AnnouncementModalProps> = ({
         // Update existing announcement - only update caption and style
         const updateData = {
           caption: caption.trim(),
-          style: {
-            fontFamily: 'Arial',
-            fontSize: '16px',
-            color: '#000000',
-            backgroundColor: '#ffffff',
-            textAlign: 'left',
-            fontWeight: 'normal'
-          }
         };
 
         // Make the API call to update announcement
@@ -148,14 +140,6 @@ const AnnouncementModal: React.FC<AnnouncementModalProps> = ({
         if (caption.trim()) {
           formData.append('caption', caption.trim());
         }
-
-        // Add style fields individually to be parsed as an object by Express
-        formData.append('style[fontFamily]', 'Arial');
-        formData.append('style[fontSize]', '16px');
-        formData.append('style[color]', '#000000');
-        formData.append('style[backgroundColor]', '#ffffff');
-        formData.append('style[textAlign]', 'left');
-        formData.append('style[fontWeight]', 'normal');
         
         // Append all new media files
         mediaFiles.forEach(mediaFile => {
@@ -180,7 +164,7 @@ const AnnouncementModal: React.FC<AnnouncementModalProps> = ({
       // Show more detailed error message
       const errorMessage = error.response?.data?.message || error.message || 'Failed to create announcement';
       console.log(errorMessage);
-      // showToast(errorMessage, ToastType.ERROR);
+      showToast(errorMessage, ToastType.ERROR);
     } finally {
       setLoading(false);
     }

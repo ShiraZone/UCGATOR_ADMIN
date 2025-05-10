@@ -1,7 +1,7 @@
 import apiClient from './apiClient';
 import { ApiResponse } from '@/data/types';
 
-export const url = import.meta.env.VITE_API_URL // || 'http://localhost:5500/api/v1';
+export const url = import.meta.env.VITE_API_URL
 
 export const testConnection = async () => {
     try {

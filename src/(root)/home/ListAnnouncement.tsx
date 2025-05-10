@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Announcement } from '../../data/models/Announcement';
 import { useLoading } from '../../context/LoadingProvider';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEdit, faTrash, faPlus, faChevronLeft, faChevronRight, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
+import { faEdit, faTrash, faPlus, faChevronLeft, faChevronRight, faEye, faEyeSlash, faHeart } from '@fortawesome/free-solid-svg-icons';
 import { DialogConfirm } from '../../components/DialogConfirm';
 import AnnouncementModal from './CreateAnnouncementModal';
 import apiClient from '../../config/apiClient';
@@ -19,6 +19,8 @@ interface CreatedBy {
 
 interface AnnouncementWithUser extends Omit<Announcement, 'createdBy'> {
   createdBy: CreatedBy;
+  likeCount: number;
+  isLikedByUser: boolean;
 }
 
 interface PaginatedResponse {
@@ -261,11 +263,17 @@ const ListAnnouncement = () => {
                         <p>{new Date(announcement.createdAt).toLocaleDateString()}</p>
                       </div>
                     </div>
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      announcement.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                      {announcement.isActive ? 'Active' : 'Deleted'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 text-gray-500">
+                        <FontAwesomeIcon icon={faHeart} className="text-red-500" />
+                        <span>{announcement.likeCount}</span>
+                      </div>
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        announcement.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                        {announcement.isActive ? 'Active' : 'Deleted'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
