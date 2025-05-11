@@ -94,16 +94,7 @@ const Login = () => {
         } catch (error: any) {
             // Access error message from response data
             const errorMessage = error.response?.data?.error;
-
-            // If the response contains HTML (like in your case)
-            if (typeof errorMessage === 'string' && errorMessage.includes('<!DOCTYPE html>')) {
-                // You might need to parse the HTML to extract the specific message
-                const matches = errorMessage.match(/<pre>Error: (.*?)<br>/);
-
-                if (matches && matches[1]) {
-                    setErrorData(`${matches[1]}`);
-                }
-            }
+            setErrorData(errorMessage || 'An error occurred during sign-in.');
         } finally {
             setLoading(false);
         }
