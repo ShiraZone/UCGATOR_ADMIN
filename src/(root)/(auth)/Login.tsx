@@ -93,7 +93,7 @@ const Login = () => {
             }
         } catch (error: any) {
             // Access error message from response data
-            const errorMessage = error.response?.data?.message;
+            const errorMessage = error.response?.data?.error;
 
             // If the response contains HTML (like in your case)
             if (typeof errorMessage === 'string' && errorMessage.includes('<!DOCTYPE html>')) {
