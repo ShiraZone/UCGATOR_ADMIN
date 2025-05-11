@@ -39,7 +39,6 @@ const SideNavBar = () => {
                             <div className="ml-8 mt-1 hidden group-hover:flex flex-col space-y-1 text-sm text-white">
                                 <Link to='/campus/map' className='text-lg font-semibold hover:text-gray-300'>Maps</Link>
                                 <Link to='/campus/root' className='text-lg font-semibold hover:text-gray-300'>Canvas</Link>
-                                <Link to='/campus/location pins' className='text-lg font-semibold hover:text-gray-300'>Pins</Link>
                             </div>
                         </div>
                         <div className='relative group'>

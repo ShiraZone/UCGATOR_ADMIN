@@ -248,12 +248,6 @@ const Campus = () => {
                 EDIT CANVAS
               </button>
             </Link>
-            <button className="w-full h-12 bg-yellow-600 hover:bg-yellow-700 rounded font-bold tracking-wide">
-              VIEW LOCATION
-            </button>
-            <button className="w-full h-12 bg-yellow-600 hover:bg-yellow-700 rounded font-bold tracking-wide">
-              ANNOUNCEMENTS
-            </button>
           </div>
 
           {/* Building/Floor Selection */}
