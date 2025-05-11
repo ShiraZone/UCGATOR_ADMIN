@@ -63,7 +63,7 @@ const PinDetailsModal: React.FC<PinDetailsModalProps> = ({ isOpen, onClose, onSa
                     />
                 </div>
                 <div className="mb-4">
-                    <label className="block text-sm font-medium">Service</label>
+                    <label className="block text-sm font-medium">Pin Type (e.g. Service, Classroom, Laboratory)</label>
                     <input
                         type="text"
                         className="w-full border rounded p-2"

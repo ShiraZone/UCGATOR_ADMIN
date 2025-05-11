@@ -1,17 +1,15 @@
 import IMAGE from "../constant/IMAGES"
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
-import { faInfoCircle, faMapPin } from "@fortawesome/free-solid-svg-icons"
+import { faInfoCircle } from "@fortawesome/free-solid-svg-icons"
 
 import { Tooltip } from 'react-tooltip'
 import { HelpModal } from "@/(root)/canvas/HelpModal"
-import PinTypeModal from "./PinTypeModal"
 
 import { useState } from "react"
 
 const NavigationBar = () => {
     const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
-    const [isPinTypeModalOpen, setIsPinTypeModalOpen] = useState(false);
 
     return (
         <>
@@ -25,18 +23,6 @@ const NavigationBar = () => {
                     </div>
                 </div>
                 <div className="relative flex flex-row justify-center items-center group gap-5">                    
-                    <div className="flex items-center">
-                        <FontAwesomeIcon 
-                            icon={faMapPin} 
-                            color="white" 
-                            className="text-xl cursor-pointer" 
-                            data-tooltip-id="pin-tooltip" 
-                            data-tooltip-content="Select & Manage Pin Types" 
-                            onClick={() => setIsPinTypeModalOpen(true)}
-                        />
-                        <Tooltip id="pin-tooltip" />
-                    </div>
-                    
                     <FontAwesomeIcon 
                         icon={faInfoCircle} 
                         color="white" 
@@ -51,10 +37,6 @@ const NavigationBar = () => {
             <HelpModal
                 isOpen={isHelpModalOpen}
                 onClose={() => setIsHelpModalOpen(false)}
-            />
-            <PinTypeModal 
-                isOpen={isPinTypeModalOpen}
-                onClose={() => setIsPinTypeModalOpen(false)}
             />
         </>
     )

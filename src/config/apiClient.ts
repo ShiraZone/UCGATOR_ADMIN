@@ -71,7 +71,7 @@ apiClient.interceptors.response.use(
 
         if (showToastFunction) {
             let message;
-            const errorMessage = error.response?.data?.message || error.message || 'An unknown error occurred';
+            const errorMessage = error.response?.data?.error || error.message || 'An unknown error occurred';
 
             if (typeof errorMessage === 'string' && errorMessage.includes('<!DOCTYPE html>')) {
                 const matches = errorMessage.match(/<pre>Error: (.*?)<br>/);

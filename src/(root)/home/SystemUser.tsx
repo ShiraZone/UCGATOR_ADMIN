@@ -6,6 +6,7 @@ import useAuthHeader from 'react-auth-kit/hooks/useAuthHeader';
 import useAuthUser from 'react-auth-kit/hooks/useAuthUser';
 import { useLoading } from '../../context/LoadingProvider';
 import { IUserData } from '@/data/types';
+import { useApiToasts } from '@/hooks/useApiToasts';
 
 let url = import.meta.env.VITE_API_URL;
 

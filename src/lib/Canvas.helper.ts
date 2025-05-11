@@ -181,7 +181,7 @@ export const loadFloorHandler = async (buildingID: string | undefined, authHeade
 export const setPinHandler = async (buildingID: string | undefined, authHeader: string, floorID: string, pins: any[], toDeletePin: string[]): Promise<boolean> => {
     if (!buildingID)
         throw new Error('Building id is required.');
-
+    
     try {
         const response = await apiClient.post<ApiResponse<boolean>>(`${url}/canvas/update-pin`,
             {

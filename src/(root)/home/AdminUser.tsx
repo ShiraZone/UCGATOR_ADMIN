@@ -170,7 +170,7 @@ const AdminUser = () => {
         return 'bg-gray-100 text-gray-800';
     }
   };
-
+  
   return (
     <div className="w-full h-full bg-gray-50 p-6">
       <div className="bg-white rounded-xl shadow-lg">
