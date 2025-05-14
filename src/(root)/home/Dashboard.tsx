@@ -168,14 +168,6 @@ const Dashboard = () => {
     ];
   }, [userStats]);
 
-  // Format building stats data with default values
-  const buildingStatsData = useMemo(() => {
-    return {
-      total: Number(buildingStats?.total || 0),
-      totalFloors: Number(buildingStats?.totalFloors || 0)
-    };
-  }, [buildingStats]);
-
   return (
     <div className='w-full'>
       <div className='h-[150px] p-5 bg-uc-blue flex flex-row'>
