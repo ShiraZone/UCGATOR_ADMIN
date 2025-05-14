@@ -36,6 +36,7 @@ import GlobalLoadingIndicator from './(root)/view/GlobalLoadingIndicator.tsx';
 import SystemUser from './(root)/home/SystemUser.tsx';
 import AdminUser from './(root)/home/AdminUser.tsx';
 import ListAnnouncement from './(root)/home/ListAnnouncement.tsx';
+import Report from './(root)/home/Report.tsx';
 
 function LoginWithGuard() {
   const isAuthenticated = useIsAuthenticated();
@@ -91,7 +92,8 @@ const router = createBrowserRouter([
             element: <ProtectedRoute element={<Dashboard />}/>
           },
           {
-            path: "reports"
+            path: "reports",
+            element: <ProtectedRoute element={<Report />} />
           },
         ]
       },
